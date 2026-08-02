@@ -81,13 +81,35 @@
 
       <div class="studio-layout">
         <div class="studio-main">
+        
+          <!-- Batch Job Progress Container -->
+          <div id="batch-progress-container" class="glass-panel" style="display: none; margin-bottom: 24px; text-align: center; padding: 24px;">
+              <h3 style="margin-bottom: 8px;">Generating Document...</h3>
+              <div class="progress-bar" style="height: 12px; background: rgba(255,255,255,0.1); border-radius: 6px; overflow: hidden; margin-bottom: 12px;">
+                  <div id="batch-progress-fill" style="width: 0%; height: 100%; background: var(--primary-color); transition: width 0.3s ease;"></div>
+              </div>
+              <p id="batch-progress-text" style="color: var(--text-secondary);">Chunk 0 of 0</p>
+              <div id="batch-action-container" style="display: none; margin-top: 16px; gap: 12px; justify-content: center;">
+                  <p style="color: #ff6b6b; margin-bottom: 8px;" id="batch-error-text">An error occurred.</p>
+                  <button type="button" class="btn btn-primary" id="btn-batch-retry">Retry Chunk</button>
+                  <button type="button" class="btn btn-secondary" id="btn-batch-skip">Skip Chunk</button>
+                  <button type="button" class="btn btn-secondary" id="btn-batch-cancel" style="background: rgba(255,107,107,0.2); color: #ff6b6b;">Cancel Job</button>
+              </div>
+          </div>
+          
           <div class="glass" style="padding: 24px;">
             <form id="voice-form">
               
               <div class="form-group">
-                <div class="range-header">
-                  <label class="form-label" id="text-label">Text Prompt <span class="required">*</span></label>
-                  <span id="format-tag" class="badge badge-default">Format: WAV</span>
+                <div class="range-header" style="margin-bottom: 8px;">
+                  <label class="form-label" id="text-label" style="margin-bottom: 0;">Text Prompt <span class="required">*</span></label>
+                  <div style="display: flex; gap: 12px; align-items: center;">
+                    <input type="file" id="document-upload" accept=".txt,.pdf,.epub" style="display: none;">
+                    <button type="button" class="btn btn-secondary btn-sm" onclick="document.getElementById('document-upload').click()" style="padding: 4px 10px; font-size: 12px;">
+                        📄 Import Document
+                    </button>
+                    <span id="format-tag" class="badge badge-default">Format: WAV</span>
+                  </div>
                 </div>
                 <textarea id="text" name="text" rows="5" placeholder="Enter text to convert into speech..." required></textarea>
                 <div class="char-counter">
@@ -312,7 +334,6 @@
       </div>
 
       <div class="stats-grid">
-        <div class="glass stat-card">
           <div class="stat-icon purple">🎙️</div>
           <div id="stat-total-voices" class="stat-value">0</div>
           <div class="stat-label">Total Voices Generated</div>

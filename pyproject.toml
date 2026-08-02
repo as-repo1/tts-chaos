@@ -11,6 +11,9 @@ dependencies = [
     "sse-starlette>=2.0.0",
     "huggingface-hub>=0.22.0",
     "python-multipart>=0.0.9",
+    "pypdf>=4.2.0",
+    "EbookLib>=0.18",
+    "beautifulsoup4>=4.12.0",
 ]
 
 [project.optional-dependencies]

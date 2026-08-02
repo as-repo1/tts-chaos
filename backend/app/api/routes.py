@@ -4,11 +4,15 @@ import logging
 from pathlib import Path
 from typing import Any
 
-from fastapi import APIRouter, HTTPException, Query, UploadFile, File, Form
+from fastapi import APIRouter, HTTPException, Query, UploadFile, File, Form, BackgroundTasks
 from fastapi.responses import FileResponse
 from pydantic import BaseModel, Field
 
-from backend.app.db.store import save_voice, list_voices, get_voice, delete_voice, search_voices, count_voices, get_stats
+from backend.app.services import generator
+from backend.app.services.model_manager import model_manager
+from backend.app.services.document_parser import parse_document
+from backend.app.services.batch_generator import start_batch_job, get_job_status, submit_job_action
+from backend.app.db.store import save_voice, list_voices, get_voice, delete_voice, search_voices, count_voices, get_stats, voices_store
 from backend.app.services.generator import generate_audio_asset, generate_cloned_audio_asset
 from backend.app.services.model_selector import auto_select_model
 from backend.app.services.model_manager import model_manager
@@ -222,10 +226,58 @@ async def stream_audio(voice_id: str) -> FileResponse:
 
 
 @router.delete("/voices/{voice_id}")
-async def remove_voice(voice_id: str) -> dict[str, str]:
+async def remove_voice(voice_id: str, background_tasks: BackgroundTasks) -> dict[str, str]:
     record = await get_voice(voice_id)
     if record is None:
         raise HTTPException(status_code=404, detail="Voice not found")
-    Path(record["file_path"]).unlink(missing_ok=True)
-    await delete_voice(voice_id)
+    background_tasks.add_task(generator.delete_audio_file, record["file_path"])
+    await voices_store.delete(voice_id)
     return {"status": "deleted", "id": voice_id}
+
+@router.post("/voice/document")
+async def create_voice_from_document(
+    file: UploadFile = File(...),
+    voice_name: str = Form("Document Audio"),
+    language: str = Form("en"),
+    style: str = Form("neutral"),
+    speed: float = Form(1.0),
+    pitch: float = Form(0.0),
+    model_id: str = Form(None),
+    voice_id: str = Form(None)
+):
+    try:
+        content = await file.read()
+        text = parse_document(content, file.filename)
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+        
+    voice_settings = {
+        "voice_name": voice_name,
+        "language": language,
+        "style": style,
+        "speed": speed,
+        "pitch": pitch,
+        "model_id": model_id,
+        "voice_id": voice_id
+    }
+    
+    # Needs absolute path to models/audio dir
+    from backend.app.services.generator import AUDIO_DIR
+    job_id = start_batch_job(text, voice_settings, str(AUDIO_DIR))
+    
+    return {"job_id": job_id, "status": "queued"}
+
+@router.get("/voice/document/{job_id}/progress")
+async def get_document_job_progress(job_id: str):
+    status = get_job_status(job_id)
+    if status.get("status") == "not_found":
+        raise HTTPException(status_code=404, detail="Job not found")
+    return status
+
+class JobAction(BaseModel):
+    action: str # "skip", "cancel"
+
+@router.post("/voice/document/{job_id}/action")
+async def handle_document_job_action(job_id: str, payload: JobAction):
+    submit_job_action(job_id, payload.action)
+    return {"status": "action_submitted"}

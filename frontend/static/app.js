@@ -667,3 +667,129 @@ document.getElementById('close-shortcuts').addEventListener('click', () => {
 // ─── INIT ──────────────────────────────────────────────────────────────────
 
 initStudio();
+
+// ─── BATCH DOCUMENT UPLOAD ──────────────────────────────────────────────────
+
+const documentUpload = document.getElementById('document-upload');
+const batchContainer = document.getElementById('batch-progress-container');
+const batchProgressFill = document.getElementById('batch-progress-fill');
+const batchProgressText = document.getElementById('batch-progress-text');
+const batchActionContainer = document.getElementById('batch-action-container');
+const batchErrorText = document.getElementById('batch-error-text');
+
+let currentBatchJobId = null;
+let batchPollInterval = null;
+
+if(documentUpload) {
+  documentUpload.addEventListener('change', async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    // Build form data
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('voice_name', document.getElementById('voice-name').value || 'Document Audio');
+    formData.append('language', document.getElementById('language').value);
+    formData.append('style', 'neutral');
+    formData.append('speed', document.getElementById('speed').value);
+    formData.append('pitch', document.getElementById('pitch').value);
+    
+    const mId = document.getElementById('model-id').value;
+    if(mId) formData.append('model_id', mId);
+    
+    const vId = document.getElementById('voice-id').value;
+    if(vId && vId !== 'auto') formData.append('voice_id', vId);
+
+    // Show Progress UI
+    batchContainer.style.display = 'block';
+    batchActionContainer.style.display = 'none';
+    batchProgressFill.style.width = '0%';
+    batchProgressText.textContent = `Uploading ${file.name}...`;
+
+    try {
+      const res = await fetch('/api/voice/document', {
+        method: 'POST',
+        body: formData
+      });
+      const data = await res.json();
+      
+      if (!res.ok) throw new Error(data.detail || 'Upload failed');
+      
+      currentBatchJobId = data.job_id;
+      startPollingBatchJob();
+      
+    } catch(err) {
+      showToast(err.message, 'error');
+      batchContainer.style.display = 'none';
+    } finally {
+      documentUpload.value = ''; // Reset
+    }
+  });
+}
+
+function startPollingBatchJob() {
+  if(batchPollInterval) clearInterval(batchPollInterval);
+  
+  batchPollInterval = setInterval(async () => {
+    if(!currentBatchJobId) {
+      clearInterval(batchPollInterval);
+      return;
+    }
+    
+    try {
+      const res = await fetch(`/api/voice/document/${currentBatchJobId}/progress`);
+      const data = await res.json();
+      
+      if(data.status === 'not_found') {
+        clearInterval(batchPollInterval);
+        batchContainer.style.display = 'none';
+        return;
+      }
+      
+      batchProgressFill.style.width = `${data.progress_percent || 0}%`;
+      
+      if(data.status === 'running' || data.status === 'queued') {
+        batchProgressText.textContent = `Generating Chunk ${data.chunks_completed || 0} of ${data.total_chunks || '...'}`;
+        batchActionContainer.style.display = 'none';
+      } 
+      else if(data.status === 'merging') {
+        batchProgressText.textContent = `Merging audio chunks...`;
+      }
+      else if(data.status === 'completed') {
+        clearInterval(batchPollInterval);
+        batchProgressText.textContent = `Completed successfully!`;
+        batchProgressFill.style.width = `100%`;
+        setTimeout(() => { batchContainer.style.display = 'none'; }, 3000);
+        api.getVoices(); // Refresh library
+      }
+      else if(data.status === 'requires_action') {
+        batchProgressText.textContent = `Error on chunk ${data.failed_chunk_idx || '?'}`;
+        batchErrorText.textContent = data.error || 'Unknown error';
+        batchActionContainer.style.display = 'flex';
+      }
+      else if(data.status === 'cancelled' || data.status === 'error') {
+        clearInterval(batchPollInterval);
+        batchProgressText.textContent = `Job ${data.status}`;
+        setTimeout(() => { batchContainer.style.display = 'none'; }, 3000);
+      }
+      
+    } catch(err) {
+      console.error("Failed to poll batch job", err);
+    }
+  }, 2000);
+}
+
+document.getElementById('btn-batch-retry')?.addEventListener('click', () => sendBatchAction('retry'));
+document.getElementById('btn-batch-skip')?.addEventListener('click', () => sendBatchAction('skip'));
+document.getElementById('btn-batch-cancel')?.addEventListener('click', () => sendBatchAction('cancel'));
+
+async function sendBatchAction(action) {
+  if(!currentBatchJobId) return;
+  batchActionContainer.style.display = 'none';
+  batchProgressText.textContent = `Sending ${action} command...`;
+  await fetch(`/api/voice/document/${currentBatchJobId}/action`, {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({action})
+  });
+}
