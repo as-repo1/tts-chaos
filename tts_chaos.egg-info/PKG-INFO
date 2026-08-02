@@ -1,0 +1,26 @@
+Metadata-Version: 2.4
+Name: tts-chaos
+Version: 0.1.0
+Requires-Python: >=3.11
+Requires-Dist: fastapi>=0.110.0
+Requires-Dist: uvicorn[standard]>=0.29.0
+Requires-Dist: pydantic>=2.6.0
+Requires-Dist: aiosqlite>=0.20.0
+Requires-Dist: httpx>=0.27.0
+Requires-Dist: sse-starlette>=2.0.0
+Requires-Dist: huggingface-hub>=0.22.0
+Requires-Dist: python-multipart>=0.0.9
+Provides-Extra: kokoro
+Requires-Dist: kokoro-onnx>=0.3.0; extra == "kokoro"
+Requires-Dist: soundfile>=0.12.1; extra == "kokoro"
+Provides-Extra: piper
+Requires-Dist: piper-tts>=1.2.0; extra == "piper"
+Provides-Extra: xtts
+Requires-Dist: TTS>=0.22.0; extra == "xtts"
+Requires-Dist: torch>=2.2.0; extra == "xtts"
+Provides-Extra: edge
+Requires-Dist: edge-tts>=6.1.9; extra == "edge"
+Provides-Extra: audio
+Requires-Dist: pydub>=0.25.1; extra == "audio"
+Provides-Extra: all
+Requires-Dist: tts-chaos[audio,edge,kokoro,piper]; extra == "all"

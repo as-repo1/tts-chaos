@@ -1,0 +1,30 @@
+[project]
+name = "tts-chaos"
+version = "0.1.0"
+requires-python = ">=3.11"
+dependencies = [
+    "fastapi>=0.110.0",
+    "uvicorn[standard]>=0.29.0",
+    "pydantic>=2.6.0",
+    "aiosqlite>=0.20.0",
+    "httpx>=0.27.0",
+    "sse-starlette>=2.0.0",
+    "huggingface-hub>=0.22.0",
+    "python-multipart>=0.0.9",
+]
+
+[project.optional-dependencies]
+kokoro = ["kokoro-onnx>=0.3.0", "soundfile>=0.12.1"]
+piper = ["piper-tts>=1.2.0"]
+xtts = ["TTS>=0.22.0", "torch>=2.2.0"]
+edge = ["edge-tts>=6.1.9"]
+audio = ["pydub>=0.25.1"]
+all = ["tts-chaos[kokoro,piper,edge,audio]"]
+
+[build-system]
+requires = ["setuptools>=70"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["backend*"]
