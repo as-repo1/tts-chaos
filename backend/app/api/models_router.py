@@ -2,9 +2,14 @@ from __future__ import annotations
 
 import asyncio
 import json
+import logging
+from pathlib import Path
+
 from fastapi import APIRouter, HTTPException
 from fastapi.responses import StreamingResponse
-from backend.app.services.model_manager import model_manager
+from backend.app.services.model_manager import model_manager, MODEL_CATALOG
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/models", tags=["models"])
 
@@ -24,7 +29,10 @@ async def get_installed():
 async def start_download(model_id: str):
     if model_manager.is_installed(model_id):
         raise HTTPException(status_code=409, detail="Model already installed")
-    await model_manager.download(model_id)
+    try:
+        await model_manager.download(model_id)
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail=str(exc))
     return {"status": "queued", "model_id": model_id}
 
 
@@ -52,13 +60,13 @@ async def download_progress(model_id: str):
 @router.delete("/{model_id}")
 async def delete_model(model_id: str):
     import shutil
-    from pathlib import Path
-    info = next((m for m in model_manager.MODEL_CATALOG if m.model_id == model_id), None)
+    info = next((m for m in MODEL_CATALOG if m.model_id == model_id), None)
     if info is None:
         raise HTTPException(status_code=404, detail="Unknown model")
     if info.is_cloud:
         raise HTTPException(status_code=400, detail="Cannot delete cloud model")
-    model_dir = Path("models") / info.engine / model_id
+    from backend.app.services.model_manager import MODELS_DIR
+    model_dir = MODELS_DIR / info.engine / model_id
     if model_dir.exists():
         shutil.rmtree(model_dir)
     model_manager._engines.pop(model_id, None)

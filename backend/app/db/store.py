@@ -28,10 +28,12 @@ CREATE TABLE IF NOT EXISTS voices (
 );
 """
 
+
 async def init_db():
     async with aiosqlite.connect(DB_PATH) as db:
         await db.execute(CREATE_VOICES)
         await db.commit()
+
 
 async def save_voice(**kwargs) -> dict[str, Any]:
     record = {
@@ -48,6 +50,7 @@ async def save_voice(**kwargs) -> dict[str, Any]:
         await db.commit()
     return record
 
+
 async def list_voices(offset: int = 0, limit: int = 50) -> list[dict]:
     async with aiosqlite.connect(DB_PATH) as db:
         db.row_factory = aiosqlite.Row
@@ -56,6 +59,7 @@ async def list_voices(offset: int = 0, limit: int = 50) -> list[dict]:
         ) as cur:
             return [dict(r) for r in await cur.fetchall()]
 
+
 async def get_voice(voice_id: str) -> dict | None:
     async with aiosqlite.connect(DB_PATH) as db:
         db.row_factory = aiosqlite.Row
@@ -63,8 +67,99 @@ async def get_voice(voice_id: str) -> dict | None:
             row = await cur.fetchone()
             return dict(row) if row else None
 
+
 async def delete_voice(voice_id: str) -> bool:
     async with aiosqlite.connect(DB_PATH) as db:
         cur = await db.execute("DELETE FROM voices WHERE id=?", (voice_id,))
         await db.commit()
         return cur.rowcount > 0
+
+
+async def search_voices(
+    query: str = "",
+    model_id: str = "",
+    language: str = "",
+    offset: int = 0,
+    limit: int = 50,
+) -> list[dict]:
+    """Full-text search with optional model and language filters."""
+    conditions = []
+    params: list = []
+
+    if query:
+        conditions.append("(text LIKE ? OR voice_name LIKE ?)")
+        params.extend([f"%{query}%", f"%{query}%"])
+    if model_id:
+        conditions.append("model_id = ?")
+        params.append(model_id)
+    if language:
+        conditions.append("language = ?")
+        params.append(language)
+
+    where = "WHERE " + " AND ".join(conditions) if conditions else ""
+    sql = f"SELECT * FROM voices {where} ORDER BY created_at DESC LIMIT ? OFFSET ?"
+    params.extend([limit, offset])
+
+    async with aiosqlite.connect(DB_PATH) as db:
+        db.row_factory = aiosqlite.Row
+        async with db.execute(sql, params) as cur:
+            return [dict(r) for r in await cur.fetchall()]
+
+
+async def count_voices(query: str = "", model_id: str = "", language: str = "") -> int:
+    conditions = []
+    params: list = []
+    if query:
+        conditions.append("(text LIKE ? OR voice_name LIKE ?)")
+        params.extend([f"%{query}%", f"%{query}%"])
+    if model_id:
+        conditions.append("model_id = ?")
+        params.append(model_id)
+    if language:
+        conditions.append("language = ?")
+        params.append(language)
+
+    where = "WHERE " + " AND ".join(conditions) if conditions else ""
+    sql = f"SELECT COUNT(*) FROM voices {where}"
+
+    async with aiosqlite.connect(DB_PATH) as db:
+        async with db.execute(sql, params) as cur:
+            row = await cur.fetchone()
+            return row[0] if row else 0
+
+
+async def get_stats() -> dict:
+    async with aiosqlite.connect(DB_PATH) as db:
+        # Total count
+        async with db.execute("SELECT COUNT(*) FROM voices") as cur:
+            total = (await cur.fetchone())[0]
+
+        # Total duration
+        async with db.execute("SELECT COALESCE(SUM(duration_sec), 0) FROM voices") as cur:
+            total_duration = round((await cur.fetchone())[0], 1)
+
+        # Total file size
+        async with db.execute("SELECT COALESCE(SUM(file_size), 0) FROM voices") as cur:
+            total_size = (await cur.fetchone())[0]
+
+        # Models used breakdown
+        db.row_factory = aiosqlite.Row
+        async with db.execute(
+            "SELECT model_id, COUNT(*) as cnt FROM voices GROUP BY model_id ORDER BY cnt DESC"
+        ) as cur:
+            models_used = [dict(r) for r in await cur.fetchall()]
+
+        # Languages breakdown
+        async with db.execute(
+            "SELECT language, COUNT(*) as cnt FROM voices GROUP BY language ORDER BY cnt DESC"
+        ) as cur:
+            languages_used = [dict(r) for r in await cur.fetchall()]
+
+    return {
+        "total_voices": total,
+        "total_duration_sec": total_duration,
+        "total_size_bytes": total_size,
+        "total_size_mb": round(total_size / 1_048_576, 1) if total_size else 0,
+        "models_used": models_used,
+        "languages_used": languages_used,
+    }

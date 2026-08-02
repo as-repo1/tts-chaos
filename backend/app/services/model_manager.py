@@ -2,14 +2,20 @@ from __future__ import annotations
 
 import asyncio
 import hashlib
+import logging
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Callable
 
 import httpx
 
+logger = logging.getLogger(__name__)
+
 MODELS_DIR = Path(__file__).resolve().parents[3] / "models"
 MODELS_DIR.mkdir(parents=True, exist_ok=True)
+
+AUDIO_DIR = Path(__file__).resolve().parents[3] / "generated_audio"
+
 
 @dataclass
 class ModelInfo:
@@ -24,20 +30,20 @@ class ModelInfo:
     hf_repo: str | None = None
     hf_filename: str | None = None
     download_url: str | None = None
-    is_cloud: bool = False   # no download needed
-    extra_files: list[tuple[str, str]] = field(default_factory=list)  # [(url, dest_name)]
+    is_cloud: bool = False
+    extra_files: list[tuple[str, str]] = field(default_factory=list)
 
 
-# ── Catalog of all known downloadable models ──────────────────────────────────
+# ── Catalog ──────────────────────────────────────────────────────────────────
 
 MODEL_CATALOG: list[ModelInfo] = [
     ModelInfo(
         model_id="edge-tts",
         display_name="Edge TTS (Cloud)",
         engine="edge-tts",
-        description="Microsoft Azure TTS — 400+ voices, 60+ languages. No download needed.",
+        description="Microsoft Azure Neural TTS — 400+ voices, 60+ languages. Zero download, always available.",
         size_mb=0,
-        languages=["en","fr","de","es","ja","zh","ar","pt","it","ko","nl","pl","ru","sv","tr"],
+        languages=["en","fr","de","es","ja","zh","ar","pt","it","ko","nl","pl","ru","sv","tr","hi","vi","th","id","cs"],
         supported_styles=["neutral","cheerful","sad","angry"],
         quality_score=70,
         is_cloud=True,
@@ -46,7 +52,7 @@ MODEL_CATALOG: list[ModelInfo] = [
         model_id="kokoro-82m",
         display_name="Kokoro 82M",
         engine="kokoro",
-        description="Lightweight ONNX model. State-of-the-art English TTS at only 82M parameters.",
+        description="State-of-the-art English TTS at only 82M parameters. ONNX inference, GPU optional.",
         size_mb=350,
         languages=["en"],
         supported_styles=["neutral","soft","dramatic"],
@@ -59,14 +65,15 @@ MODEL_CATALOG: list[ModelInfo] = [
     ),
     ModelInfo(
         model_id="piper-en-lessac",
-        display_name="Piper EN Lessac",
+        display_name="Piper EN Lessac (Medium)",
         engine="piper",
-        description="Piper TTS — fast CPU inference, American English (Lessac voice).",
+        description="Piper TTS — fast CPU inference, American English (Lessac voice, medium quality).",
         size_mb=63,
         languages=["en"],
         supported_styles=["neutral"],
         quality_score=75,
         download_url="https://huggingface.co/rhasspy/piper-voices/resolve/v1.0.0/en/en_US/lessac/medium/en_US-lessac-medium.onnx",
+        hf_filename="en_US-lessac-medium.onnx",
         extra_files=[
             ("https://huggingface.co/rhasspy/piper-voices/resolve/v1.0.0/en/en_US/lessac/medium/en_US-lessac-medium.onnx.json",
              "en_US-lessac-medium.onnx.json"),
@@ -75,9 +82,17 @@ MODEL_CATALOG: list[ModelInfo] = [
 ]
 
 
+def _dir_size_mb(path: Path) -> float:
+    """Get total size of a directory in MB."""
+    if not path.exists():
+        return 0.0
+    total = sum(f.stat().st_size for f in path.rglob("*") if f.is_file())
+    return round(total / 1_048_576, 1)
+
+
 class ModelManager:
     def __init__(self):
-        self._engines: dict[str, object] = {}  # model_id → TTSEngine instance
+        self._engines: dict[str, object] = {}
         self._progress: dict[str, asyncio.Queue] = {}
         self._scan_installed()
 
@@ -103,10 +118,19 @@ class ModelManager:
         engine = self._engines.get(model_id)
         return engine is not None and engine.is_available()
 
+    # ── System Info ───────────────────────────────────────────────────────────
+
+    def get_disk_usage(self) -> dict:
+        return {
+            "models_mb": _dir_size_mb(MODELS_DIR),
+            "audio_mb": _dir_size_mb(AUDIO_DIR),
+            "models_dir": str(MODELS_DIR),
+            "audio_dir": str(AUDIO_DIR),
+        }
+
     # ── Download ──────────────────────────────────────────────────────────────
 
     async def download(self, model_id: str) -> asyncio.Queue:
-        """Start background download. Returns a progress Queue."""
         info = self._find_info(model_id)
         if info is None:
             raise ValueError(f"Unknown model: {model_id}")
@@ -121,7 +145,8 @@ class ModelManager:
 
                 files_to_download = []
                 if info.download_url:
-                    files_to_download.append((info.download_url, info.hf_filename or "model.onnx"))
+                    dest_name = info.hf_filename or info.download_url.split("/")[-1]
+                    files_to_download.append((info.download_url, dest_name))
                 elif info.hf_repo and info.hf_filename:
                     url = f"https://huggingface.co/{info.hf_repo}/resolve/main/{info.hf_filename}"
                     files_to_download.append((url, info.hf_filename))
@@ -135,6 +160,7 @@ class ModelManager:
                 await queue.put({"event": "download_complete", "model_id": model_id})
                 self._scan_installed()
             except Exception as exc:
+                logger.exception("Download failed for %s", model_id)
                 await queue.put({"event": "download_error", "error": str(exc)})
             finally:
                 self._progress.pop(model_id, None)
@@ -147,12 +173,14 @@ class ModelManager:
     def get_engine(self, model_id: str):
         if model_id not in self._engines:
             self._load_engine(model_id)
-        return self._engines[model_id]
+        engine = self._engines.get(model_id)
+        if engine is None:
+            raise RuntimeError(f"Engine for '{model_id}' could not be loaded")
+        return engine
 
-    # ── Private helpers ───────────────────────────────────────────────────────
+    # ── Private ───────────────────────────────────────────────────────────────
 
     def _scan_installed(self):
-        """Load engine instances for all installed models."""
         from .engines.edge_tts_engine import EdgeTTSEngine
         from .engines.kokoro import KokoroEngine
         from .engines.piper import PiperEngine
@@ -163,9 +191,12 @@ class ModelManager:
             "piper-en-lessac": PiperEngine,
         }
         for model_id, cls in engine_map.items():
-            inst = cls()
-            if inst.is_available():
-                self._engines[model_id] = inst
+            try:
+                inst = cls()
+                if inst.is_available():
+                    self._engines[model_id] = inst
+            except Exception:
+                logger.debug("Engine %s not available", model_id, exc_info=True)
 
     def _load_engine(self, model_id: str):
         self._scan_installed()
