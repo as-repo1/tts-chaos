@@ -45,6 +45,36 @@ User (Browser)
 
 ---
 
+## 2. Voice Cloning Pipeline (XTTS)
+
+```
+User (Browser)
+    │
+    ▼
+[POST /api/voice/clone] ── (Multipart FormData: audio_file, text, voice_name)
+    │
+    ├─► Save uploaded audio to tempfile (.wav)
+    │
+    ├─► Call generator.generate_cloned_audio_asset(text, ref_audio_path, xtts-v2)
+    │       │
+    │       ├─ ModelManager.get_engine("xtts-v2")
+    │       ├─ TTSEngine.generate_cloned()
+    │       │       │
+    │       │       └─ Coqui XTTS inference with gpt_cond_len=3, temperature=0.75
+    │       │
+    │       └─ Write output WAV to generated_audio/
+    │
+    ├─► Delete tempfile
+    │
+    ├─► VoiceStore.save(record) 
+    │       │
+    │       └─ INSERT INTO voices (model_id='xtts-v2', voice_id='cloned')
+    │
+    └─► Return VoiceRecord JSON to browser
+```
+
+---
+
 ## 2. Model Download Pipeline
 
 ```
@@ -174,6 +204,10 @@ index.html parsed → app.js (ES modules) loaded
     Library tab:
     ├─► Voice cards with inline <audio> + custom waveform via Web Audio API
     └─► Delete click → DELETE /api/voices/{id} → remove card
+
+    Cloning tab:
+    ├─► Drag-and-drop audio file upload
+    └─► Submit → Show multi-bar waveform → POST /api/voice/clone (FormData) → Redirect to Library
 ```
 
 ---
@@ -199,6 +233,25 @@ FastAPI lifespan (async context manager)
     │
     ├─► Mount /static → frontend/static/
     └─► Mount / → frontend/index.html (SPA catch-all)
+```
+
+---
+
+## 7. Docker Deployment Pipeline
+
+```
+Host OS
+    │
+    ▼
+[docker-compose up -d]
+    │
+    ├─► Builds image from Dockerfile (python:3.11-slim)
+    │       ├─ Install ffmpeg, build-essential
+    │       └─ uv pip install requirements
+    │
+    ├─► Mounts Volumes: ./models, ./generated_audio
+    │
+    └─► Exposes Container Port 2002 -> Host Port 2002
 ```
 
 ---

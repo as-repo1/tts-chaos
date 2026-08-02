@@ -22,9 +22,11 @@ A full-stack, self-hosted Text-to-Speech studio built with **FastAPI** (backend)
 ```
 tts-chaos/
 ├── README.md                   ← you are here
-├── pipeline.md                 ← CI/CD and data flow pipeline
-├── implementation.md           ← step-by-step development guide
 ├── pyproject.toml              ← Python project config + dependencies
+├── docs/                       ← Documentation folder
+│   ├── pipeline.md             ← CI/CD and data flow pipeline
+│   ├── implementation.md       ← step-by-step development guide
+│   └── workdone.md             ← record of completed tasks
 │
 ├── backend/
 │   ├── __init__.py
@@ -111,7 +113,7 @@ uvicorn backend.app.main:app --reload --host 0.0.0.0 --port 2002
 
 ## 🔌 API Reference
 
-Base URL: `http://localhost:8000`
+Base URL: `http://localhost:2002`
 
 ### Voice Endpoints
 
@@ -156,9 +158,9 @@ Base URL: `http://localhost:8000`
 | Model | Engine | Size | Languages | GPU |
 |---|---|---|---|---|
 | **Kokoro-82M** | kokoro-onnx | ~350 MB | English | Optional |
-| **Piper (en_US-lessac)** | piper-tts | ~63 MB | 30+ langs | CPU only |
-| **Coqui XTTS-v2** | TTS library | ~1.8 GB | 17 langs | Recommended |
-| **Edge-TTS** | edge-tts | 0 MB | 60+ langs | None (cloud) |
+| **Piper (15+ Voices)** | piper-tts | ~60-120 MB | English, French, German, Hindi, etc. | CPU only |
+| **Coqui XTTS-v2** | TTS library | ~2.1 GB | 17 langs | Recommended |
+| **Edge-TTS** | edge-tts | 0 MB | 60+ langs (incl. Bengali) | None (cloud) |
 
 ---
 
@@ -168,7 +170,7 @@ All configuration is via environment variables (or `.env` file):
 
 ```env
 HOST=0.0.0.0
-PORT=8000
+PORT=2002
 MODELS_DIR=./models
 AUDIO_DIR=./generated_audio
 DB_PATH=./backend/app/data/voices.db
@@ -185,8 +187,8 @@ MAX_CONCURRENT_GENERATIONS=4
 - [x] Phase 1: Real engine layer (Edge-TTS, Kokoro, Piper, XTTS)
 - [x] Phase 2: Model management API + SSE progress
 - [x] Phase 3: Premium frontend (glassmorphism SPA)
-- [ ] Phase 4: Batch generation + voice cloning
-- [ ] Phase 5: Docker packaging
+- [x] Phase 4: Batch generation + voice cloning
+- [x] Phase 5: Docker packaging
 
 ---
 
