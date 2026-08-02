@@ -37,10 +37,16 @@
         <span class="shortcut">Ctrl+3</span>
       </div>
 
+      <div class="nav-item" data-tab="cloning">
+        <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z" /></svg>
+        Voice Cloning
+        <span class="shortcut">Ctrl+4</span>
+      </div>
+
       <div class="nav-item" data-tab="dashboard">
         <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path></svg>
         Dashboard
-        <span class="shortcut">Ctrl+4</span>
+        <span class="shortcut">Ctrl+5</span>
       </div>
     </div>
 
@@ -141,6 +147,19 @@
         <div class="studio-sidebar">
           <div class="glass-elevated sidebar-card">
             <h4>Model & Engine</h4>
+            
+            <div class="form-group">
+              <label class="form-label">Voice Mode</label>
+              <select id="voice-mode">
+                <option value="all">All Modes</option>
+                <option value="audiobook">Audiobooks</option>
+                <option value="podcast">Podcasts</option>
+                <option value="narrator">Narrators</option>
+                <option value="persona">Personas</option>
+                <option value="poet">Poet / Expressive</option>
+              </select>
+            </div>
+            
             <div class="form-group">
               <label class="form-label">Target Model</label>
               <select id="model-id" name="model_id">
@@ -217,6 +236,70 @@
       </div>
 
       <div id="library-list" class="voices-list"></div>
+    </section>
+
+    <!-- CLONING TAB -->
+    <section id="tab-cloning" class="tab-content">
+      <div class="page-header">
+        <div>
+          <h2>Voice Cloning Studio</h2>
+          <div class="subtitle">Upload a voice sample to mimic its tone, accent, and style in zero-shot.</div>
+        </div>
+      </div>
+
+      <div class="glass" style="max-width: 800px; padding: 32px; margin: 0 auto;">
+        <form id="clone-form">
+          <div class="form-group">
+            <label class="form-label">Reference Audio Sample <span class="required">*</span></label>
+            <div class="upload-zone" id="upload-zone">
+              <input type="file" id="clone-audio" name="audio_file" accept=".wav,.mp3" required>
+              <div class="upload-icon">🎵</div>
+              <div class="upload-text" id="upload-text">Click or drag & drop an audio file here</div>
+              <div class="upload-subtext">Supported formats: WAV, MP3 (Max 10 seconds, clear speech, no background noise)</div>
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">Text to Synthesize <span class="required">*</span></label>
+            <textarea id="clone-text" name="text" rows="4" placeholder="Type the text you want the cloned voice to say..." required></textarea>
+          </div>
+          
+          <div class="grid-2">
+            <div class="form-group" style="margin-bottom:0;">
+              <label class="form-label">Language</label>
+              <select id="clone-lang" name="language">
+                <option value="en">English</option>
+                <option value="fr">French</option>
+                <option value="de">German</option>
+                <option value="es">Spanish</option>
+                <option value="it">Italian</option>
+                <option value="pt">Portuguese</option>
+                <option value="pl">Polish</option>
+                <option value="tr">Turkish</option>
+                <option value="ru">Russian</option>
+              </select>
+            </div>
+            
+            <div class="form-group" style="margin-bottom:0;">
+              <label class="form-label">Output Voice Name</label>
+              <input type="text" id="clone-name" name="voice_name" value="Cloned Voice" required>
+            </div>
+          </div>
+          
+          <div style="margin-top: 32px; display: flex; align-items: center; justify-content: space-between;">
+            <button type="submit" class="btn btn-primary" id="clone-btn">
+              <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z" /></svg>
+              <span>Clone Voice & Generate</span>
+            </button>
+            <div id="clone-waveform" class="waveform" style="display: none; width: 120px;">
+              <div class="waveform-bar"></div><div class="waveform-bar"></div>
+              <div class="waveform-bar"></div><div class="waveform-bar"></div>
+              <div class="waveform-bar"></div><div class="waveform-bar"></div>
+              <div class="waveform-bar"></div><div class="waveform-bar"></div>
+            </div>
+          </div>
+        </form>
+      </div>
     </section>
 
     <!-- DASHBOARD TAB -->

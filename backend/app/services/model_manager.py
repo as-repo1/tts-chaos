@@ -27,6 +27,7 @@ class ModelInfo:
     languages: list[str]
     supported_styles: list[str]
     quality_score: int
+    use_cases: list[str] = field(default_factory=list) # e.g. "audiobook", "podcast", "narrator", "poet", "persona", "cloning"
     hf_repo: str | None = None
     hf_filename: str | None = None
     download_url: str | None = None
@@ -37,46 +38,204 @@ class ModelInfo:
 # ── Catalog ──────────────────────────────────────────────────────────────────
 
 MODEL_CATALOG: list[ModelInfo] = [
+    # --- Edge TTS ---
     ModelInfo(
         model_id="edge-tts",
         display_name="Edge TTS (Cloud)",
         engine="edge-tts",
         description="Microsoft Azure Neural TTS — 400+ voices, 60+ languages. Zero download, always available.",
         size_mb=0,
-        languages=["en","fr","de","es","ja","zh","ar","pt","it","ko","nl","pl","ru","sv","tr","hi","vi","th","id","cs"],
+        languages=["en","fr","de","es","ja","zh","ar","pt","it","ko","nl","pl","ru","sv","tr","hi","bn","vi","th","id","cs"],
         supported_styles=["neutral","cheerful","sad","angry"],
         quality_score=70,
+        use_cases=["narrator", "podcast", "audiobook"],
         is_cloud=True,
     ),
+    
+    # --- XTTS v2 ---
+    ModelInfo(
+        model_id="xtts-v2",
+        display_name="Coqui XTTS v2 (Voice Cloning)",
+        engine="xtts",
+        description="Zero-shot voice cloning. Mimic any voice using just a 3-second audio sample.",
+        size_mb=2100,
+        languages=["en","es","fr","de","it","pt","pl","tr","ru","nl","cs","ar","zh","hu","ko","ja","hi","bn"],
+        supported_styles=["neutral"],
+        quality_score=95,
+        use_cases=["cloning", "podcast", "persona"],
+        hf_repo="coqui/XTTS-v2",
+        hf_filename="model.pth",
+        extra_files=[
+            ("https://huggingface.co/coqui/XTTS-v2/resolve/main/config.json", "config.json"),
+            ("https://huggingface.co/coqui/XTTS-v2/resolve/main/vocab.json", "vocab.json"),
+        ],
+    ),
+    
+    # --- Kokoro ---
     ModelInfo(
         model_id="kokoro-82m",
         display_name="Kokoro 82M",
         engine="kokoro",
-        description="State-of-the-art English TTS at only 82M parameters. ONNX inference, GPU optional.",
+        description="State-of-the-art English TTS at only 82M parameters. ONNX inference.",
         size_mb=350,
         languages=["en"],
         supported_styles=["neutral","soft","dramatic"],
         quality_score=88,
+        use_cases=["narrator", "podcast", "audiobook"],
         hf_repo="hexgrad/Kokoro-82M",
         hf_filename="kokoro-v1.0.onnx",
         extra_files=[
             ("https://huggingface.co/hexgrad/Kokoro-82M/resolve/main/voices.bin", "voices.bin"),
         ],
     ),
+    
+    # --- Piper Models (High Quality) ---
     ModelInfo(
-        model_id="piper-en-lessac",
-        display_name="Piper EN Lessac (Medium)",
+        model_id="piper-en-libritts-high",
+        display_name="Libritts (Multi-Speaker)",
         engine="piper",
-        description="Piper TTS — fast CPU inference, American English (Lessac voice, medium quality).",
-        size_mb=63,
+        description="High quality American English. Over 900 distinct speakers. Great for varied character roles.",
+        size_mb=122,
+        languages=["en"],
+        supported_styles=["neutral"],
+        quality_score=85,
+        use_cases=["audiobook", "persona"],
+        download_url="https://huggingface.co/rhasspy/piper-voices/resolve/v1.0.0/en/en_US/libritts/high/en_US-libritts-high.onnx",
+        hf_filename="en_US-libritts-high.onnx",
+        extra_files=[
+            ("https://huggingface.co/rhasspy/piper-voices/resolve/v1.0.0/en/en_US/libritts/high/en_US-libritts-high.onnx.json", "en_US-libritts-high.onnx.json"),
+        ],
+    ),
+    ModelInfo(
+        model_id="piper-en-ryan-high",
+        display_name="Ryan (Male Narrator)",
+        engine="piper",
+        description="Deep, clear male voice. Perfect for professional narrations and audiobooks.",
+        size_mb=98,
+        languages=["en"],
+        supported_styles=["neutral"],
+        quality_score=85,
+        use_cases=["narrator", "audiobook", "podcast"],
+        download_url="https://huggingface.co/rhasspy/piper-voices/resolve/v1.0.0/en/en_US/ryan/high/en_US-ryan-high.onnx",
+        hf_filename="en_US-ryan-high.onnx",
+        extra_files=[
+            ("https://huggingface.co/rhasspy/piper-voices/resolve/v1.0.0/en/en_US/ryan/high/en_US-ryan-high.onnx.json", "en_US-ryan-high.onnx.json"),
+        ],
+    ),
+    
+    # --- Piper Models (Medium Quality Personas) ---
+    ModelInfo(
+        model_id="piper-en-amy-medium",
+        display_name="Amy (Female Podcast)",
+        engine="piper",
+        description="Warm, engaging female voice. Excellent for podcasts and conversational reading.",
+        size_mb=61,
+        languages=["en"],
+        supported_styles=["neutral"],
+        quality_score=78,
+        use_cases=["podcast", "narrator"],
+        download_url="https://huggingface.co/rhasspy/piper-voices/resolve/v1.0.0/en/en_US/amy/medium/en_US-amy-medium.onnx",
+        hf_filename="en_US-amy-medium.onnx",
+        extra_files=[
+            ("https://huggingface.co/rhasspy/piper-voices/resolve/v1.0.0/en/en_US/amy/medium/en_US-amy-medium.onnx.json", "en_US-amy-medium.onnx.json"),
+        ],
+    ),
+    ModelInfo(
+        model_id="piper-en-arctic-medium",
+        display_name="Arctic (Expressive Poet)",
+        engine="piper",
+        description="Expressive, slightly dramatic reading style. Great for poetry and emotional texts.",
+        size_mb=62,
+        languages=["en"],
+        supported_styles=["neutral"],
+        quality_score=77,
+        use_cases=["poet", "persona"],
+        download_url="https://huggingface.co/rhasspy/piper-voices/resolve/v1.0.0/en/en_US/arctic/medium/en_US-arctic-medium.onnx",
+        hf_filename="en_US-arctic-medium.onnx",
+        extra_files=[
+            ("https://huggingface.co/rhasspy/piper-voices/resolve/v1.0.0/en/en_US/arctic/medium/en_US-arctic-medium.onnx.json", "en_US-arctic-medium.onnx.json"),
+        ],
+    ),
+    ModelInfo(
+        model_id="piper-en-alan-medium",
+        display_name="Alan (British Male)",
+        engine="piper",
+        description="Clear British (UK) male voice.",
+        size_mb=60,
         languages=["en"],
         supported_styles=["neutral"],
         quality_score=75,
-        download_url="https://huggingface.co/rhasspy/piper-voices/resolve/v1.0.0/en/en_US/lessac/medium/en_US-lessac-medium.onnx",
-        hf_filename="en_US-lessac-medium.onnx",
+        use_cases=["persona", "narrator"],
+        download_url="https://huggingface.co/rhasspy/piper-voices/resolve/v1.0.0/en/en_GB/alan/medium/en_GB-alan-medium.onnx",
+        hf_filename="en_GB-alan-medium.onnx",
         extra_files=[
-            ("https://huggingface.co/rhasspy/piper-voices/resolve/v1.0.0/en/en_US/lessac/medium/en_US-lessac-medium.onnx.json",
-             "en_US-lessac-medium.onnx.json"),
+            ("https://huggingface.co/rhasspy/piper-voices/resolve/v1.0.0/en/en_GB/alan/medium/en_GB-alan-medium.onnx.json", "en_GB-alan-medium.onnx.json"),
+        ],
+    ),
+    ModelInfo(
+        model_id="piper-en-alba-medium",
+        display_name="Alba (British Female)",
+        engine="piper",
+        description="Clear British (UK) female voice.",
+        size_mb=63,
+        languages=["en"],
+        supported_styles=["neutral"],
+        quality_score=76,
+        use_cases=["persona", "podcast"],
+        download_url="https://huggingface.co/rhasspy/piper-voices/resolve/v1.0.0/en/en_GB/alba/medium/en_GB-alba-medium.onnx",
+        hf_filename="en_GB-alba-medium.onnx",
+        extra_files=[
+            ("https://huggingface.co/rhasspy/piper-voices/resolve/v1.0.0/en/en_GB/alba/medium/en_GB-alba-medium.onnx.json", "en_GB-alba-medium.onnx.json"),
+        ],
+    ),
+    
+    # --- Non-English ---
+    ModelInfo(
+        model_id="piper-fr-siwis-medium",
+        display_name="Siwis (French)",
+        engine="piper",
+        description="Standard French female narrator.",
+        size_mb=62,
+        languages=["fr"],
+        supported_styles=["neutral"],
+        quality_score=75,
+        use_cases=["narrator", "audiobook"],
+        download_url="https://huggingface.co/rhasspy/piper-voices/resolve/v1.0.0/fr/fr_FR/siwis/medium/fr_FR-siwis-medium.onnx",
+        hf_filename="fr_FR-siwis-medium.onnx",
+        extra_files=[
+            ("https://huggingface.co/rhasspy/piper-voices/resolve/v1.0.0/fr/fr_FR/siwis/medium/fr_FR-siwis-medium.onnx.json", "fr_FR-siwis-medium.onnx.json"),
+        ],
+    ),
+    ModelInfo(
+        model_id="piper-de-thorsten-high",
+        display_name="Thorsten (German)",
+        engine="piper",
+        description="High quality German male voice.",
+        size_mb=100,
+        languages=["de"],
+        supported_styles=["neutral"],
+        quality_score=85,
+        use_cases=["narrator", "podcast"],
+        download_url="https://huggingface.co/rhasspy/piper-voices/resolve/v1.0.0/de/de_DE/thorsten/high/de_DE-thorsten-high.onnx",
+        hf_filename="de_DE-thorsten-high.onnx",
+        extra_files=[
+            ("https://huggingface.co/rhasspy/piper-voices/resolve/v1.0.0/de/de_DE/thorsten/high/de_DE-thorsten-high.onnx.json", "de_DE-thorsten-high.onnx.json"),
+        ],
+    ),
+    ModelInfo(
+        model_id="piper-hi-pratham-medium",
+        display_name="Pratham (Hindi)",
+        engine="piper",
+        description="Clear Hindi male voice.",
+        size_mb=68,
+        languages=["hi"],
+        supported_styles=["neutral"],
+        quality_score=75,
+        use_cases=["narrator", "podcast"],
+        download_url="https://huggingface.co/rhasspy/piper-voices/resolve/v1.0.0/hi/hi_IN/pratham/medium/hi_IN-pratham-medium.onnx",
+        hf_filename="hi_IN-pratham-medium.onnx",
+        extra_files=[
+            ("https://huggingface.co/rhasspy/piper-voices/resolve/v1.0.0/hi/hi_IN/pratham/medium/hi_IN-pratham-medium.onnx.json", "hi_IN-pratham-medium.onnx.json"),
         ],
     ),
 ]
@@ -188,8 +347,19 @@ class ModelManager:
         engine_map = {
             "edge-tts": EdgeTTSEngine,
             "kokoro-82m": KokoroEngine,
-            "piper-en-lessac": PiperEngine,
         }
+
+        # Add all piper models from catalog
+        for m in MODEL_CATALOG:
+            if m.model_id.startswith("piper-"):
+                engine_map[m.model_id] = PiperEngine
+            elif m.model_id == "xtts-v2":
+                try:
+                    from .engines.xtts_engine import XttsEngine
+                    engine_map["xtts-v2"] = XttsEngine
+                except ImportError:
+                    pass
+
         for model_id, cls in engine_map.items():
             try:
                 inst = cls()

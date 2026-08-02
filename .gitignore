@@ -15,6 +15,7 @@ htmlcov/
 
 # Local data (don't commit generated data and models)
 data/
+backend/data/
 models/
 generated_audio/
 

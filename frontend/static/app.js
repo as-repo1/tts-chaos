@@ -73,6 +73,17 @@ const API = {
     }
     return res.json();
   },
+  async cloneVoice(formData) {
+    const res = await fetch('/api/voice/clone', {
+      method: 'POST',
+      body: formData
+    });
+    if (!res.ok) {
+      const err = await res.json();
+      throw new Error(err.detail || 'Cloning failed');
+    }
+    return res.json();
+  },
   async startDownload(modelId) {
     const res = await fetch(`/api/models/download/${modelId}`, { method: 'POST' });
     if (!res.ok) {
@@ -138,7 +149,8 @@ window.addEventListener('keydown', (e) => {
   if (e.ctrlKey && e.key === '1') { e.preventDefault(); switchTab('studio'); }
   if (e.ctrlKey && e.key === '2') { e.preventDefault(); switchTab('models'); }
   if (e.ctrlKey && e.key === '3') { e.preventDefault(); switchTab('library'); }
-  if (e.ctrlKey && e.key === '4') { e.preventDefault(); switchTab('dashboard'); }
+  if (e.ctrlKey && e.key === '4') { e.preventDefault(); switchTab('cloning'); }
+  if (e.ctrlKey && e.key === '5') { e.preventDefault(); switchTab('dashboard'); }
 
   if (e.key === '?') {
     e.preventDefault();
@@ -153,6 +165,7 @@ const textInput = document.getElementById('text');
 const modelSelect = document.getElementById('model-id');
 const voiceSelect = document.getElementById('voice-id');
 const langSelect = document.getElementById('language');
+const modeSelect = document.getElementById('voice-mode');
 const autoHint = document.getElementById('auto-hint');
 const generateBtn = document.getElementById('generate-btn');
 const studioWaveform = document.getElementById('studio-waveform');
@@ -166,19 +179,28 @@ const batchSwitch = document.getElementById('batch-switch');
 
 async function initStudio() {
   State.catalog = await API.getCatalog();
+  filterModelsByMode();
+  updateRecommendation();
+  updateLibraryBadge();
+}
 
-  // Populate models dropdown
+function filterModelsByMode() {
+  const mode = modeSelect.value;
   modelSelect.innerHTML = '<option value="">Auto Select (Recommended)</option>';
+  
   State.catalog.filter(m => m.is_installed).forEach(m => {
+    if (mode !== 'all' && (!m.use_cases || !m.use_cases.includes(mode))) return;
     const opt = document.createElement('option');
     opt.value = m.model_id;
     opt.textContent = m.display_name;
     modelSelect.appendChild(opt);
   });
-
-  updateRecommendation();
-  updateLibraryBadge();
 }
+
+modeSelect.addEventListener('change', () => {
+  filterModelsByMode();
+  updateRecommendation();
+});
 
 async function updateRecommendation() {
   if (modelSelect.value !== '') {
@@ -331,6 +353,7 @@ async function renderModels() {
       <div class="model-desc">${model.description}</div>
       <div class="model-tags">
         ${model.languages.map(l => `<span class="model-tag">${l.toUpperCase()}</span>`).join('')}
+        ${(model.use_cases || []).map(u => `<span class="model-tag use-case">${u}</span>`).join('')}
         <span class="model-tag">Score: ${model.quality_score}</span>
       </div>
       <div class="model-footer">${btnHtml}</div>
@@ -528,6 +551,76 @@ async function renderDashboard() {
     `).join('');
   }
 }
+
+// ─── CLONING TAB LOGIC ─────────────────────────────────────────────────────
+
+const uploadZone = document.getElementById('upload-zone');
+const cloneAudio = document.getElementById('clone-audio');
+const uploadText = document.getElementById('upload-text');
+const cloneForm = document.getElementById('clone-form');
+const cloneBtn = document.getElementById('clone-btn');
+const cloneWaveform = document.getElementById('clone-waveform');
+
+uploadZone.addEventListener('click', () => cloneAudio.click());
+
+['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+  uploadZone.addEventListener(eventName, preventDefaults, false);
+});
+
+function preventDefaults(e) {
+  e.preventDefault();
+  e.stopPropagation();
+}
+
+['dragenter', 'dragover'].forEach(eventName => {
+  uploadZone.addEventListener(eventName, () => uploadZone.classList.add('dragover'), false);
+});
+
+['dragleave', 'drop'].forEach(eventName => {
+  uploadZone.addEventListener(eventName, () => uploadZone.classList.remove('dragover'), false);
+});
+
+uploadZone.addEventListener('drop', (e) => {
+  let dt = e.dataTransfer;
+  let files = dt.files;
+  if (files.length) {
+    cloneAudio.files = files;
+    uploadText.textContent = files[0].name;
+  }
+});
+
+cloneAudio.addEventListener('change', (e) => {
+  if (e.target.files.length) {
+    uploadText.textContent = e.target.files[0].name;
+  }
+});
+
+cloneForm.addEventListener('submit', async (e) => {
+  e.preventDefault();
+  
+  if (!cloneAudio.files.length) {
+    Toast.show('Please upload an audio sample first.', 'error');
+    return;
+  }
+
+  cloneBtn.disabled = true;
+  cloneWaveform.style.display = 'flex';
+  cloneWaveform.classList.add('active');
+
+  try {
+    const formData = new FormData(cloneForm);
+    await API.cloneVoice(formData);
+    Toast.show('Voice successfully cloned and synthesized!');
+    updateLibraryBadge();
+    switchTab('library');
+  } catch (err) {
+    Toast.show(err.message, 'error');
+  } finally {
+    cloneBtn.disabled = false;
+    cloneWaveform.style.display = 'none';
+    cloneWaveform.classList.remove('active');
+  }
+});
 
 // ─── SETTINGS DRAWER ───────────────────────────────────────────────────────
 

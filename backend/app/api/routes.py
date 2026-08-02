@@ -4,12 +4,12 @@ import logging
 from pathlib import Path
 from typing import Any
 
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, HTTPException, Query, UploadFile, File, Form
 from fastapi.responses import FileResponse
 from pydantic import BaseModel, Field
 
 from backend.app.db.store import save_voice, list_voices, get_voice, delete_voice, search_voices, count_voices, get_stats
-from backend.app.services.generator import generate_audio_asset
+from backend.app.services.generator import generate_audio_asset, generate_cloned_audio_asset
 from backend.app.services.model_selector import auto_select_model
 from backend.app.services.model_manager import model_manager
 
@@ -130,6 +130,53 @@ async def create_batch_voices(payload: BatchVoiceRequest) -> dict[str, Any]:
             errors.append({"index": i, "text": text[:80], "error": str(exc)})
 
     return {"generated": len(results), "errors": errors, "voices": results}
+
+
+@router.post("/voice/clone")
+async def create_cloned_voice(
+    text: str = Form(...),
+    voice_name: str = Form("cloned-voice"),
+    language: str = Form("en"),
+    audio_file: UploadFile = File(...)
+) -> dict[str, Any]:
+    """Clone a voice from an uploaded reference audio file using XTTS v2."""
+    
+    # Save uploaded reference audio to temporary path
+    import tempfile
+    import shutil
+    
+    with tempfile.NamedTemporaryFile(delete=False, suffix=".wav") as tmp:
+        shutil.copyfileobj(audio_file.file, tmp)
+        tmp_path = tmp.name
+        
+    try:
+        asset = generate_cloned_audio_asset(
+            text=text,
+            ref_audio_path=tmp_path,
+            voice_name=voice_name,
+            language=language,
+            model_id="xtts-v2",
+        )
+    except RuntimeError as exc:
+        raise HTTPException(status_code=500, detail=str(exc))
+    finally:
+        Path(tmp_path).unlink(missing_ok=True)
+        
+    record = await save_voice(
+        voice_name=voice_name,
+        language=language,
+        style="neutral",
+        text=text,
+        model_id="xtts-v2",
+        voice_id="cloned",
+        speed=1.0,
+        pitch=0.0,
+        file_path=asset["file_path"],
+        file_size=asset["file_size"],
+        duration_sec=asset.get("duration_sec"),
+        output_format="wav",
+    )
+    return record
 
 
 @router.get("/voices")

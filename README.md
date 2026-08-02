@@ -78,19 +78,26 @@ tts-chaos/
 ### 2. Install
 
 ```bash
+git clone https://github.com/yourusername/tts-chaos.git
 cd tts-chaos
-python -m venv .venv
-source .venv/bin/activate   # Windows: .venv\Scripts\activate
-pip install -e ".[all]"
+
+# Using Docker (Recommended)
+docker-compose up -d
+
+# OR Manual Setup
+uv venv .venv
+source .venv/bin/activate
+uv pip install -r requirements.txt
 ```
 
 ### 3. Run
 
 ```bash
-uvicorn backend.app.main:app --reload --host 0.0.0.0 --port 8000
+source .venv/bin/activate
+uvicorn backend.app.main:app --reload --host 0.0.0.0 --port 2002
 ```
 
-Open **http://localhost:8000** in your browser.
+2. Open `http://localhost:2002` in your browser.
 
 ### 4. First Steps
 

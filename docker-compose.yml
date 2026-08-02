@@ -1,0 +1,14 @@
+version: '3.8'
+
+services:
+  tts-chaos:
+    build: .
+    container_name: tts-chaos
+    ports:
+      - "2002:2002"
+    volumes:
+      - ./models:/app/models
+      - ./generated_audio:/app/generated_audio
+    restart: unless-stopped
+    environment:
+      - PORT=2002

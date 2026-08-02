@@ -72,3 +72,47 @@ def generate_audio_asset(
         "file_size": len(raw_audio),
         "duration_sec": duration,
     }
+
+
+def generate_cloned_audio_asset(
+    text: str,
+    ref_audio_path: str,
+    voice_name: str,
+    language: str = "en",
+    model_id: str = "xtts-v2",
+) -> dict[str, str | int | float | None]:
+    """Generates zero-shot cloned voice using a reference audio file."""
+    
+    from .model_manager import model_manager
+    from typing import Any
+    
+    engine = model_manager.get_engine(model_id)
+    if not hasattr(engine, "generate_cloned"):
+        raise RuntimeError(f"Engine for {model_id} does not support voice cloning.")
+        
+    try:
+        audio_bytes = engine.generate_cloned(
+            text=text,
+            ref_audio_path=ref_audio_path,
+            language=language
+        )
+    except Exception as exc:
+        logger.exception("Cloning failed")
+        raise RuntimeError(f"Voice cloning failed: {exc}")
+
+    timestamp = datetime.utcnow().strftime("%Y%m%d%H%M%S%f")
+    safe_name = "".join(c if c.isalnum() or c in ("_", "-") else "_" for c in voice_name)
+    file_name = f"{safe_name}_{timestamp}.wav"
+    file_path = AUDIO_DIR / file_name
+    
+    file_path.write_bytes(audio_bytes)
+        
+    duration = _get_wav_duration(audio_bytes)
+
+    return {
+        "file_name": file_name,
+        "file_path": str(file_path),
+        "file_size": len(audio_bytes),
+        "duration_sec": duration,
+        "output_format": "wav"
+    }
