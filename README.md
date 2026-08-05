@@ -8,7 +8,10 @@ TTS Chaos is a self-hosted, browser-first text-to-speech studio built with FastA
 
 - Generates audio from text using a pluggable engine abstraction
 - Supports cloud fallback with Edge-TTS and local engines for Kokoro, Piper, and XTTS
-- Lets users browse model availability, download progress, and recommended model selection
+- Features advanced **Audio Processing** via FFmpeg (ducking, sound effects, EQs)
+- Leverages **Semantic AI** (`sentence-transformers`) for smart topic chunking and emotion detection
+- Includes an integrated **Audio Mixer DAW** to arrange and mix multiple tracks
+- Features **AI RSS Summarization** using local LLMs (`sshleifer/distilbart-cnn-12-6`)
 - Persists voice records in SQLite and streams saved audio files back to the browser
 - Ships with a Docker-first deployment shape for self-hosting
 
@@ -118,6 +121,8 @@ Base URL: `http://localhost:2002`
 | `POST` | `/api/voice/batch` | Batch voice generation from a list of texts |
 | `POST` | `/api/voice/clone` | Clone a voice from uploaded reference audio |
 | `POST` | `/api/voice/document` | Queue a document-to-audio batch job |
+| `POST` | `/api/voice/rss` | Convert an RSS feed to a podcast (supports AI summarization) |
+| `POST` | `/api/voice/mix` | Mix multiple audio tracks together at specific timestamps |
 | `GET` | `/api/voices` | List stored voices |
 | `GET` | `/api/voices/search` | Search stored voices |
 | `GET` | `/api/voices/stats` | Inventory and storage statistics |

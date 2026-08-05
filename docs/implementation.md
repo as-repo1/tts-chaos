@@ -17,6 +17,9 @@ The application is organized around four major layers:
    - [backend/app/services/model_manager.py](../backend/app/services/model_manager.py)
    - [backend/app/services/model_selector.py](../backend/app/services/model_selector.py)
    - [backend/app/services/batch_generator.py](../backend/app/services/batch_generator.py)
+   - [backend/app/services/semantic_analyzer.py](../backend/app/services/semantic_analyzer.py)
+   - [backend/app/services/summarizer.py](../backend/app/services/summarizer.py)
+   - [backend/app/services/audio_processor.py](../backend/app/services/audio_processor.py)
 
 3. Persistence layer
    - [backend/app/db/store.py](../backend/app/db/store.py)

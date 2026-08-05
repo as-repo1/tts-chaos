@@ -18,10 +18,19 @@ POST /api/voice
   │
   ├─ Validate payload with Pydantic
   ├─ Auto-select a model when `model_id` is omitted
+  ├─ Apply AI Emotion/Semantic analysis (Phase 4)
   ├─ Resolve an engine through `ModelManager`
   ├─ Generate audio bytes
+  ├─ Process audio effects via FFmpeg (ducking, EQ, FX) (Phase 1/2)
   ├─ Write the output file under `generated_audio/`
   └─ Store a row in the SQLite `voices` table
+
+POST /api/voice/mix (Audio Mixer - Phase 5)
+  │
+  ├─ Load multiple selected audio files via `pydub`
+  ├─ Overlay files at precise millisecond timestamps
+  ├─ Export master mixed `.wav`
+  └─ Store master mix in the SQLite `voices` table
 
 GET /api/voices/{voice_id}/audio
   │
