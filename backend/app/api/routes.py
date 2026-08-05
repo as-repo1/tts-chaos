@@ -13,8 +13,12 @@ from backend.app.services.model_manager import model_manager
 from backend.app.services.document_parser import parse_document
 from backend.app.services.batch_generator import start_batch_job, get_job_status, submit_job_action
 from backend.app.db.store import save_voice, list_voices, get_voice, delete_voice, search_voices, count_voices, get_stats, voices_store
-from backend.app.services.generator import generate_audio_asset, generate_cloned_audio_asset
-from backend.app.services.audio_processor import convert_audio_sync
+from backend.app.services.generator import (
+    generate_audio_asset,
+    generate_cloned_audio_asset,
+    convert_audio_sync,
+    AUDIO_DIR
+)
 from backend.app.services.model_selector import auto_select_model
 
 logger = logging.getLogger(__name__)
@@ -75,7 +79,7 @@ async def create_voice(payload: VoiceCreateRequest) -> dict[str, Any]:
         style_to_use = detect_style(payload.text)
 
     try:
-        asset = generate_audio_asset(
+        asset = await generate_audio_asset(
             text=payload.text,
             voice_name=payload.voice_name,
             language=payload.language,
@@ -89,12 +93,14 @@ async def create_voice(payload: VoiceCreateRequest) -> dict[str, Any]:
         
         if payload.effects:
             from backend.app.services.audio_processor import apply_effects
-            new_path = await apply_effects(Path(asset["file_path"]), payload.effects)
+            file_path = str(asset["file_path"]) if asset["file_path"] else ""
+            new_path = await apply_effects(Path(file_path), payload.effects)
             asset["file_path"] = str(new_path)
             asset["file_size"] = new_path.stat().st_size
             
         if payload.output_format != "wav":
-            new_path = convert_audio_sync(Path(asset["file_path"]), payload.output_format)
+            file_path = str(asset["file_path"]) if asset["file_path"] else ""
+            new_path = convert_audio_sync(Path(file_path), payload.output_format)
             asset["file_path"] = str(new_path)
             asset["file_size"] = new_path.stat().st_size
     except RuntimeError as exc:
@@ -137,7 +143,7 @@ async def create_batch_voices(payload: BatchVoiceRequest) -> dict[str, Any]:
             style_to_use = detect_style(text)
             
         try:
-            asset = generate_audio_asset(
+            asset = await generate_audio_asset(
                 text=text,
                 voice_name=f"{payload.voice_name}_{i + 1:03d}",
                 language=payload.language,
@@ -149,7 +155,8 @@ async def create_batch_voices(payload: BatchVoiceRequest) -> dict[str, Any]:
                 output_format="wav",
             )
             if payload.output_format != "wav":
-                new_path = convert_audio_sync(Path(asset["file_path"]), payload.output_format)
+                file_path = str(asset["file_path"]) if asset["file_path"] else ""
+                new_path = convert_audio_sync(Path(file_path), payload.output_format)
                 asset["file_path"] = str(new_path)
                 asset["file_size"] = new_path.stat().st_size
 
@@ -311,7 +318,7 @@ async def mix_audio_tracks(payload: MixRequest) -> dict[str, Any]:
             raise HTTPException(status_code=400, detail="No clips provided")
 
         max_duration = 0
-        loaded_clips = []
+        loaded_clips: list[dict[str, Any]] = []
         for clip in payload.clips:
             voice_record = await get_voice(clip.voice_id)
             if not voice_record:
@@ -335,8 +342,8 @@ async def mix_audio_tracks(payload: MixRequest) -> dict[str, Any]:
         mixed = AudioSegment.silent(duration=max_duration)
         
         # Overlay clips
-        for clip in loaded_clips:
-            mixed = mixed.overlay(clip["audio"], position=clip["start"])
+        for c in loaded_clips:
+            mixed = mixed.overlay(c["audio"], position=c["start"])
             
         # Export
         voice_id = str(uuid.uuid4())

@@ -45,7 +45,7 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(
     title="TTS Chaos",
-    version="2.0.0",
+    version="1.1.0",
     lifespan=lifespan,
     docs_url="/docs" if ENABLE_DOCS else None,
     redoc_url="/redoc" if ENABLE_DOCS else None,
@@ -80,7 +80,7 @@ async def system_info():
     installed = model_manager.list_installed()
     uptime = int(time.time() - _START_TIME)
     return {
-        "version": "2.0.0",
+        "version": "1.1.0",
         "uptime_seconds": uptime,
         "installed_models": len(installed),
         "installed_model_ids": [m.model_id for m in installed],

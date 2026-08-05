@@ -24,9 +24,10 @@ class PiperEngine(TTSEngine):
             return False
 
     def generate(self, text: str, voice_id: str = "auto", speed: float = 1.0,
-                 pitch: float = 0.0, language: str = "en", **kwargs) -> bytes:
+                 pitch: float = 0.0, language: str = "en", model_id: str = "", **kwargs: typing.Any) -> bytes:
         from piper import PiperVoice
-        model_id = kwargs.get("model_id", "")
+        if not model_id:
+            model_id = kwargs.get("model_id", "")
         model_path = self._find_model(language, model_id)
         if model_path is None:
             raise RuntimeError(f"No complete Piper model installed for language '{language}'")
@@ -78,6 +79,6 @@ class PiperEngine(TTSEngine):
                 return onnx
         return None
 
-    def list_voices(self, **kwargs) -> list[dict]:
+    def list_voices(self, model_id: str = "", **kwargs: typing.Any) -> list[dict]:
         # Piper models are self-contained voices, so return empty to use Default Persona
         return []

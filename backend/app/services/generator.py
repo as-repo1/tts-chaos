@@ -6,6 +6,9 @@ import wave
 import logging
 from pathlib import Path
 from datetime import datetime, timezone
+from backend.app.config import settings
+from fastapi.concurrency import run_in_threadpool
+import inspect
 
 logger = logging.getLogger(__name__)
 
@@ -27,13 +30,13 @@ def _get_wav_duration(data: bytes) -> float | None:
     return None
 
 
-def generate_audio_asset(
+async def generate_audio_asset(
     text: str,
     voice_name: str,
     language: str,
     style: str,
-    model_id: str,
-    voice_id: str = "default",
+    model_id: str = "",
+    voice_id: str = "auto",
     speed: float = 1.0,
     pitch: float = 0.0,
     output_format: str = "wav",
@@ -46,13 +49,19 @@ def generate_audio_asset(
         raise RuntimeError(f"Engine '{model_id}' is not available: {exc}") from exc
 
     try:
-        # Generate audio bytes
-        raw_audio = engine.generate(text=text, voice_id=voice_id, speed=speed,
-                                    pitch=pitch, language=language, model_id=model_id, style=style)
-    except TypeError:
-        # Fallback if engine does not accept style kwarg
-        raw_audio = engine.generate(text=text, voice_id=voice_id, speed=speed,
-                                    pitch=pitch, language=language, model_id=model_id)
+        sig = inspect.signature(engine.generate)
+        if "style" in sig.parameters or any(p.kind == inspect.Parameter.VAR_KEYWORD for p in sig.parameters.values()):
+            raw_audio = await run_in_threadpool(
+                engine.generate,
+                text=text, voice_id=voice_id, speed=speed, pitch=pitch,
+                language=language, model_id=model_id, style=style
+            )
+        else:
+            raw_audio = await run_in_threadpool(
+                engine.generate,
+                text=text, voice_id=voice_id, speed=speed, pitch=pitch,
+                language=language, model_id=model_id
+            )
     except Exception as exc:
         logger.exception("TTS engine '%s' failed during generation", model_id)
         raise RuntimeError(f"Generation failed ({model_id}): {exc}") from exc

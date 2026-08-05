@@ -173,15 +173,18 @@ async def get_stats() -> dict:
     async with aiosqlite.connect(DB_PATH) as db:
         # Total count
         async with db.execute("SELECT COUNT(*) FROM voices") as cur:
-            total = (await cur.fetchone())[0]
+            row = await cur.fetchone()
+            total = row[0] if row else 0
 
         # Total duration
         async with db.execute("SELECT COALESCE(SUM(duration_sec), 0) FROM voices") as cur:
-            total_duration = round((await cur.fetchone())[0], 1)
+            row = await cur.fetchone()
+            total_duration = round(row[0], 1) if row else 0.0
 
         # Total file size
         async with db.execute("SELECT COALESCE(SUM(file_size), 0) FROM voices") as cur:
-            total_size = (await cur.fetchone())[0]
+            row = await cur.fetchone()
+            total_size = row[0] if row else 0
 
         # Models used breakdown
         db.row_factory = aiosqlite.Row

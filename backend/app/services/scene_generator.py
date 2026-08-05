@@ -60,7 +60,7 @@ async def generate_scene(script: str, character_voices: dict, settings: dict) ->
             # Need a model ID to proceed
             raise ValueError(f"No model_id specified for character: {char}")
             
-        asset = generate_audio_asset(
+        asset = await generate_audio_asset(
             text=text,
             voice_name=char_config.get("voice_name", char),
             language=char_config.get("language", "en"),

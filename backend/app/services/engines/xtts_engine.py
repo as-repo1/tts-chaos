@@ -2,13 +2,7 @@ import io
 import wave
 import torch
 import numpy as np
-
-# Monkey patch torch.load for PyTorch 2.6+ which defaults weights_only=True
-_original_torch_load = torch.load
-def _patched_torch_load(*args, **kwargs):
-    kwargs.setdefault("weights_only", False)
-    return _original_torch_load(*args, **kwargs)
-torch.load = _patched_torch_load
+from unittest.mock import patch
 
 # Monkey patch numpy for older libraries expecting broadcast_to in stride_tricks
 if not hasattr(np.lib.stride_tricks, 'broadcast_to'):
@@ -54,7 +48,15 @@ class XttsEngine(TTSEngine):
         config.load_json(str(config_path))
         
         model = Xtts.init_from_config(config)
-        model.load_checkpoint(config, checkpoint_dir=str(model_path))
+        
+        # Patch torch.load securely only during model load
+        _original_torch_load = torch.load
+        def _patched_torch_load(*args, **kwargs):
+            kwargs.setdefault("weights_only", False)
+            return _original_torch_load(*args, **kwargs)
+            
+        with patch("torch.load", _patched_torch_load):
+            model.load_checkpoint(config, checkpoint_dir=str(model_path))
         
         import torch
         if torch.cuda.is_available():
@@ -64,7 +66,7 @@ class XttsEngine(TTSEngine):
         self._config = config
 
     def generate(self, text: str, voice_id: str = "auto", speed: float = 1.0,
-                 pitch: float = 0.0, language: str = "en", **kwargs) -> bytes:
+                 pitch: float = 0.0, language: str = "en", model_id: str = "", **kwargs: typing.Any) -> bytes:
         self._load_model()
         if not self._model.speaker_manager or not self._model.speaker_manager.speakers:
             raise RuntimeError("No speakers available in XTTS model.")
@@ -126,7 +128,7 @@ class XttsEngine(TTSEngine):
         buf.seek(0)
         return buf.read()
 
-    def list_voices(self, **kwargs) -> list[dict]:
+    def list_voices(self, model_id: str = "", **kwargs: typing.Any) -> list[dict]:
         self._load_model()
         if not self._model or not self._model.speaker_manager:
             return []

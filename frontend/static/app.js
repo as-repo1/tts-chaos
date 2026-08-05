@@ -117,22 +117,30 @@ const State = {
 // ─── TAB ROUTER ────────────────────────────────────────────────────────────
 
 function switchTab(tabId) {
-  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
-  document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+  const updateDOM = () => {
+    document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+    document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
 
-  const navItem = document.querySelector(`.nav-item[data-tab="${tabId}"]`);
-  const content = document.getElementById(`tab-${tabId}`);
+    const navItem = document.querySelector(`.nav-item[data-tab="${tabId}"]`);
+    const content = document.getElementById(`tab-${tabId}`);
 
-  if (navItem) navItem.classList.add('active');
-  if (content) content.classList.add('active');
+    if (navItem) navItem.classList.add('active');
+    if (content) content.classList.add('active');
 
-  if (tabId === 'models') renderModels();
-  if (tabId === 'library') {
-    renderLibrary();
-    renderDashboard();
-  }
-  if (tabId === 'director') {
-    // any director init
+    if (tabId === 'models') renderModels();
+    if (tabId === 'library') {
+      renderLibrary();
+      renderDashboard();
+    }
+    if (tabId === 'director') {
+      // any director init
+    }
+  };
+
+  if (!document.startViewTransition) {
+    updateDOM();
+  } else {
+    document.startViewTransition(() => updateDOM());
   }
 }
 
@@ -326,6 +334,7 @@ streamSwitch.addEventListener('click', () => {
 form.addEventListener('submit', async (e) => {
   e.preventDefault();
   generateBtn.disabled = true;
+  generateBtn.classList.add('generating');
   studioWaveform.style.display = 'flex';
   studioWaveform.classList.add('active');
 
@@ -378,6 +387,7 @@ form.addEventListener('submit', async (e) => {
     Toast.show(err.message, 'error');
   } finally {
     generateBtn.disabled = false;
+    generateBtn.classList.remove('generating');
     studioWaveform.style.display = 'none';
     studioWaveform.classList.remove('active');
   }
@@ -793,6 +803,7 @@ cloneForm.addEventListener('submit', async (e) => {
   }
 
   cloneBtn.disabled = true;
+  cloneBtn.classList.add('generating');
   cloneWaveform.style.display = 'flex';
   cloneWaveform.classList.add('active');
 
@@ -806,6 +817,7 @@ cloneForm.addEventListener('submit', async (e) => {
     Toast.show(err.message, 'error');
   } finally {
     cloneBtn.disabled = false;
+    cloneBtn.classList.remove('generating');
     cloneWaveform.style.display = 'none';
     cloneWaveform.classList.remove('active');
   }

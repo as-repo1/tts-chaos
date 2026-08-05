@@ -40,7 +40,7 @@ class BarkEngine(TTSEngine):
             logger.info(f"Bark model loaded on {device}.")
 
     def generate(self, text: str, voice_id: str = "auto", speed: float = 1.0,
-                 pitch: float = 0.0, language: str = "en", **kwargs) -> bytes:
+                 pitch: float = 0.0, language: str = "en", model_id: str = "", **kwargs: typing.Any) -> bytes:
         import scipy.io.wavfile
         import torch
         self._load_model()
@@ -64,7 +64,7 @@ class BarkEngine(TTSEngine):
         buf.seek(0)
         return buf.read()
         
-    def list_voices(self, **kwargs) -> list[dict]:
+    def list_voices(self, model_id: str = "", **kwargs: typing.Any) -> list[dict]:
         # Bark has many presets, we'll expose a few notable ones for English
         return [
             {"id": "v2/en_speaker_6", "name": "English Male (Standard)", "gender": "M", "language": "en"},

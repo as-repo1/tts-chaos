@@ -92,7 +92,7 @@ class EdgeTTSEngine(TTSEngine):
             return False
 
     def generate(self, text: str, voice_id: str = "auto", speed: float = 1.0,
-                 pitch: float = 0.0, language: str = "en", style: str = "neutral", **kwargs) -> bytes:
+                 pitch: float = 0.0, language: str = "en", model_id: str = "", style: str = "", **kwargs: typing.Any) -> bytes:
         """Generate audio using edge-tts. Runs the async code in a thread
         to avoid 'asyncio.run() inside running loop' crashes."""
         import edge_tts
@@ -124,7 +124,7 @@ class EdgeTTSEngine(TTSEngine):
         future = _EXECUTOR.submit(_sync_generate)
         return future.result(timeout=120)
 
-    def list_voices(self, **kwargs) -> list[dict]:
+    def list_voices(self, model_id: str = "", **kwargs: typing.Any) -> list[dict]:
         try:
             loop = asyncio.new_event_loop()
             voices = loop.run_until_complete(_fetch_all_voices())

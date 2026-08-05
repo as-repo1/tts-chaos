@@ -106,25 +106,20 @@ async def process_batch_job(job_id: str, text: str, voice_settings: dict, output
             chunk_text_str = chunks[chunk_idx]
 
             try:
-                # generate_audio_asset is a sync function — run it in a thread pool
-                # to avoid blocking the async event loop.
-                model_id = voice_settings.get("model_id")
+                # generate_audio_asset is an async function now.
+                model_id = voice_settings.get("model_id") or ""
                 voice_name_chunk = f"{voice_settings.get('voice_name', 'chunk')}_{chunk_idx:04d}"
 
-                loop = asyncio.get_running_loop()
-                asset = await loop.run_in_executor(
-                    None,
-                    lambda: generate_audio_asset(
-                        text=chunk_text_str,
-                        voice_name=voice_name_chunk,
-                        language=voice_settings.get("language", "en"),
-                        style=voice_settings.get("style", "neutral"),
-                        model_id=model_id,
-                        voice_id=voice_settings.get("voice_id", "default") or "default",
-                        speed=voice_settings.get("speed", 1.0),
-                        pitch=voice_settings.get("pitch", 0.0),
-                        output_format="wav",  # Enforce WAV for clean concatenation
-                    )
+                asset = await generate_audio_asset(
+                    text=chunk_text_str,
+                    voice_name=voice_name_chunk,
+                    language=voice_settings.get("language", "en"),
+                    style=voice_settings.get("style", "neutral"),
+                    model_id=model_id,
+                    voice_id=voice_settings.get("voice_id", "default") or "default",
+                    speed=voice_settings.get("speed", 1.0),
+                    pitch=voice_settings.get("pitch", 0.0),
+                    output_format="wav",  # Enforce WAV for clean concatenation
                 )
 
                 # Copy the generated file into our work dir for later merging

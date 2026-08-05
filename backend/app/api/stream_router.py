@@ -45,7 +45,7 @@ async def websocket_endpoint(websocket: WebSocket):
             
             for i, sentence in enumerate(sentences):
                 # Generate each chunk
-                result = generate_audio_asset(
+                result = await generate_audio_asset(
                     text=sentence,
                     voice_name="stream_chunk",
                     language=language,
