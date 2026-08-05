@@ -231,11 +231,23 @@ modeSelect.addEventListener('change', () => {
 });
 
 async function updateRecommendation() {
+  const barkHint = document.getElementById('bark-hint');
+  
   if (modelSelect.value !== '') {
     autoHint.textContent = '';
+    
+    // Show bark hint if Bark is selected
+    if (modelSelect.value.includes('bark')) {
+      barkHint.style.display = 'block';
+    } else {
+      barkHint.style.display = 'none';
+    }
+    
     loadVoicesForModel(modelSelect.value);
     return;
   }
+  
+  barkHint.style.display = 'none';
   const text = textInput.value || 'Hello';
   const lang = langSelect.value;
   try {

@@ -24,10 +24,11 @@ class TTSEngine(ABC):
         speed: float = 1.0,
         pitch: float = 0.0,
         language: str = "en",
+        model_id: str = "",
     ) -> bytes:
         """Return raw WAV bytes (PCM 16-bit, mono or stereo)."""
         ...
 
-    def list_voices(self) -> list[dict]:
+    def list_voices(self, model_id: str = "") -> list[dict]:
         """Return list of {id, name, gender, language} dicts."""
         return []

@@ -85,7 +85,7 @@ async def list_model_voices(model_id: str):
     if not model_manager.is_installed(model_id):
         raise HTTPException(status_code=404, detail="Model not installed")
     engine = model_manager.get_engine(model_id)
-    return {"voices": engine.list_voices()}
+    return {"voices": engine.list_voices(model_id=model_id)}
 
 
 @router.get("/recommend")

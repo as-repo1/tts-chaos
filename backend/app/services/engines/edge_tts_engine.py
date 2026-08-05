@@ -124,7 +124,7 @@ class EdgeTTSEngine(TTSEngine):
         future = _EXECUTOR.submit(_sync_generate)
         return future.result(timeout=120)
 
-    def list_voices(self) -> list[dict]:
+    def list_voices(self, **kwargs) -> list[dict]:
         try:
             loop = asyncio.new_event_loop()
             voices = loop.run_until_complete(_fetch_all_voices())
@@ -135,9 +135,16 @@ class EdgeTTSEngine(TTSEngine):
 
 
 async def _async_generate(edge_tts, text: str, voice: str, rate: str, pitch: str) -> bytes:
-    buf = io.BytesIO()
-    communicate = edge_tts.Communicate(text, voice, rate=rate, pitch=pitch)
-    async for chunk in communicate.stream():
-        if chunk["type"] == "audio":
-            buf.write(chunk["data"])
-    return buf.getvalue()
+    for attempt in range(3):
+        try:
+            buf = io.BytesIO()
+            communicate = edge_tts.Communicate(text, voice, rate=rate, pitch=pitch)
+            async for chunk in communicate.stream():
+                if chunk["type"] == "audio":
+                    buf.write(chunk["data"])
+            return buf.getvalue()
+        except Exception as e:
+            if attempt == 2:
+                raise
+            logger.warning(f"Edge TTS generation failed (attempt {attempt+1}): {e}. Retrying...")
+            await asyncio.sleep(1)

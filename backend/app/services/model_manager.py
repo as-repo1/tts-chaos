@@ -34,6 +34,7 @@ class ModelInfo:
     is_cloud: bool = False
     extra_files: list[tuple[str, str]] = field(default_factory=list)
     rename_map: dict[str, str] = field(default_factory=dict)
+    pip_packages: list[str] = field(default_factory=list)
 
 
 # ── Catalog ──────────────────────────────────────────────────────────────────
@@ -70,6 +71,7 @@ MODEL_CATALOG: list[ModelInfo] = [
             ("https://huggingface.co/coqui/XTTS-v2/resolve/main/config.json", "config.json"),
             ("https://huggingface.co/coqui/XTTS-v2/resolve/main/vocab.json", "vocab.json"),
         ],
+        pip_packages=["TTS"],
     ),
     
     # --- Kokoro ---
@@ -89,6 +91,21 @@ MODEL_CATALOG: list[ModelInfo] = [
             ("https://github.com/thewh1teagle/kokoro-onnx/releases/download/model-files-v1.0/voices-v1.0.bin", "voices-v1.0.bin"),
         ],
         rename_map={"model.onnx": "kokoro-v1.0.onnx", "voices-v1.0.bin": "voices.bin"},
+    ),
+    
+    # --- Suno Bark ---
+    ModelInfo(
+        model_id="bark-small",
+        display_name="Suno Bark (Small)",
+        engine="bark",
+        description="Transformer-based text-to-audio model capable of highly expressive speech and non-speech sounds like [laughs] and [sighs].",
+        size_mb=1200,
+        languages=["en", "fr", "de", "es", "ja", "ko", "pt", "ru", "zh", "tr", "pl", "it"],
+        supported_styles=["neutral", "expressive"],
+        quality_score=90,
+        use_cases=["persona", "cloning", "expressive"],
+        is_cloud=False,
+        pip_packages=["transformers", "scipy", "torch"],
     ),
     
     # --- Piper Models (High Quality) ---
@@ -168,6 +185,7 @@ MODEL_CATALOG: list[ModelInfo] = [
         supported_styles=["neutral"],
         quality_score=75,
         use_cases=["persona", "narrator"],
+        pip_packages=["piper-tts"],
         download_url="https://huggingface.co/rhasspy/piper-voices/resolve/v1.0.0/en/en_GB/alan/medium/en_GB-alan-medium.onnx",
         hf_filename="en_GB-alan-medium.onnx",
         extra_files=[
@@ -184,6 +202,7 @@ MODEL_CATALOG: list[ModelInfo] = [
         supported_styles=["neutral"],
         quality_score=76,
         use_cases=["persona", "podcast"],
+        pip_packages=["piper-tts"],
         download_url="https://huggingface.co/rhasspy/piper-voices/resolve/v1.0.0/en/en_GB/alba/medium/en_GB-alba-medium.onnx",
         hf_filename="en_GB-alba-medium.onnx",
         extra_files=[
@@ -202,6 +221,7 @@ MODEL_CATALOG: list[ModelInfo] = [
         supported_styles=["neutral"],
         quality_score=75,
         use_cases=["narrator", "audiobook"],
+        pip_packages=["piper-tts"],
         download_url="https://huggingface.co/rhasspy/piper-voices/resolve/v1.0.0/fr/fr_FR/siwis/medium/fr_FR-siwis-medium.onnx",
         hf_filename="fr_FR-siwis-medium.onnx",
         extra_files=[
@@ -218,6 +238,7 @@ MODEL_CATALOG: list[ModelInfo] = [
         supported_styles=["neutral"],
         quality_score=85,
         use_cases=["narrator", "podcast"],
+        pip_packages=["piper-tts"],
         download_url="https://huggingface.co/rhasspy/piper-voices/resolve/v1.0.0/de/de_DE/thorsten/high/de_DE-thorsten-high.onnx",
         hf_filename="de_DE-thorsten-high.onnx",
         extra_files=[
@@ -234,6 +255,7 @@ MODEL_CATALOG: list[ModelInfo] = [
         supported_styles=["neutral"],
         quality_score=75,
         use_cases=["narrator", "podcast"],
+        pip_packages=["piper-tts"],
         download_url="https://huggingface.co/rhasspy/piper-voices/resolve/v1.0.0/hi/hi_IN/pratham/medium/hi_IN-pratham-medium.onnx",
         hf_filename="hi_IN-pratham-medium.onnx",
         extra_files=[
@@ -250,6 +272,7 @@ MODEL_CATALOG: list[ModelInfo] = [
         supported_styles=["neutral"],
         quality_score=72,
         use_cases=["narrator", "podcast"],
+        pip_packages=["piper-tts"],
         download_url="https://huggingface.co/rhasspy/piper-voices/resolve/v1.0.0/bn/bn_BD/multi/medium/bn_BD-multi-medium.onnx",
         hf_filename="bn_BD-multi-medium.onnx",
         extra_files=[
@@ -338,6 +361,20 @@ class ModelManager:
                         rename_to = info.rename_map[dest_name]
                         (dest_dir / dest_name).rename(dest_dir / rename_to)
 
+                if info.pip_packages:
+                    import subprocess
+                    import sys
+                    await queue.put({"event": "download_started", "file": f"Installing packages: {', '.join(info.pip_packages)}"})
+                    try:
+                        subprocess.run(
+                            [sys.executable, "-m", "pip", "install", *info.pip_packages],
+                            check=True,
+                            capture_output=True
+                        )
+                    except subprocess.CalledProcessError as e:
+                        logger.error(f"Failed to install pip packages: {e.stderr.decode()}")
+                        raise RuntimeError(f"Failed to install Python dependencies for {model_id}")
+
                 await queue.put({"event": "download_complete", "model_id": model_id})
                 self._scan_installed()
             except Exception as exc:
@@ -375,10 +412,16 @@ class ModelManager:
             "kokoro-82m": KokoroEngine,
         }
 
-        # Add all piper models from catalog
+        # Add all piper and bark models from catalog
         for m in MODEL_CATALOG:
             if m.model_id.startswith("piper-"):
                 engine_map[m.model_id] = PiperEngine
+            elif m.model_id == "bark-small":
+                try:
+                    from .engines.bark_engine import BarkEngine
+                    engine_map["bark-small"] = BarkEngine
+                except ImportError:
+                    pass
             elif m.model_id == "xtts-v2":
                 try:
                     from .engines.xtts_engine import XttsEngine

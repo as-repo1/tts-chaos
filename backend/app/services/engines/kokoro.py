@@ -57,7 +57,7 @@ class KokoroEngine(TTSEngine):
                 str(voices_path),
             )
 
-    def generate(self, text: str, voice_id: str = "af_heart", speed: float = 1.0,
+    def generate(self, text: str, voice_id: str = "auto", speed: float = 1.0,
                  pitch: float = 0.0, language: str = "en", **kwargs) -> bytes:
         import io, soundfile as sf
         self._load()
@@ -67,5 +67,5 @@ class KokoroEngine(TTSEngine):
         buf.seek(0)
         return buf.read()
 
-    def list_voices(self) -> list[dict]:
+    def list_voices(self, **kwargs) -> list[dict]:
         return self._VOICES

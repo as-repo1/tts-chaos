@@ -46,12 +46,13 @@ def generate_audio_asset(
         raise RuntimeError(f"Engine '{model_id}' is not available: {exc}") from exc
 
     try:
+        # Generate audio bytes
         raw_audio = engine.generate(text=text, voice_id=voice_id, speed=speed,
-                                     pitch=pitch, language=language, style=style)
+                                    pitch=pitch, language=language, model_id=model_id, style=style)
     except TypeError:
         # Fallback if engine does not accept style kwarg
         raw_audio = engine.generate(text=text, voice_id=voice_id, speed=speed,
-                                     pitch=pitch, language=language)
+                                    pitch=pitch, language=language, model_id=model_id)
     except Exception as exc:
         logger.exception("TTS engine '%s' failed during generation", model_id)
         raise RuntimeError(f"Generation failed ({model_id}): {exc}") from exc

@@ -1,6 +1,20 @@
 import io
-import os
 import wave
+import torch
+import numpy as np
+
+# Monkey patch torch.load for PyTorch 2.6+ which defaults weights_only=True
+_original_torch_load = torch.load
+def _patched_torch_load(*args, **kwargs):
+    kwargs.setdefault("weights_only", False)
+    return _original_torch_load(*args, **kwargs)
+torch.load = _patched_torch_load
+
+# Monkey patch numpy for older libraries expecting broadcast_to in stride_tricks
+if not hasattr(np.lib.stride_tricks, 'broadcast_to'):
+    np.lib.stride_tricks.broadcast_to = np.broadcast_to
+
+import os
 from pathlib import Path
 from .base import TTSEngine
 
@@ -50,8 +64,39 @@ class XttsEngine(TTSEngine):
         self._config = config
 
     def generate(self, text: str, voice_id: str = "auto", speed: float = 1.0,
-                 pitch: float = 0.0, language: str = "en") -> bytes:
-        raise NotImplementedError("Use generate_cloned instead.")
+                 pitch: float = 0.0, language: str = "en", **kwargs) -> bytes:
+        self._load_model()
+        if not self._model.speaker_manager or not self._model.speaker_manager.speakers:
+            raise RuntimeError("No speakers available in XTTS model.")
+            
+        speakers = list(self._model.speaker_manager.speakers.keys())
+        speaker = "Claribel Dervla" if "Claribel Dervla" in speakers else speakers[0]
+        
+        if voice_id and voice_id != "auto" and voice_id in speakers:
+            speaker = voice_id
+
+        out = self._model.synthesize(
+            text,
+            config=self._config,
+            speaker_wav=None,
+            speaker_name=speaker,
+            gpt_cond_len=3,
+            language=language,
+        )
+        
+        audio_array = out["wav"]
+        import numpy as np
+        audio_int16 = (audio_array * 32767).astype(np.int16)
+        
+        buf = io.BytesIO()
+        with wave.open(buf, "wb") as wav:
+            wav.setnchannels(1)
+            wav.setsampwidth(2)
+            wav.setframerate(24000)
+            wav.writeframes(audio_int16.tobytes())
+            
+        buf.seek(0)
+        return buf.read()
 
     def generate_cloned(self, text: str, ref_audio_path: str, language: str = "en") -> bytes:
         self._load_model()
@@ -81,5 +126,12 @@ class XttsEngine(TTSEngine):
         buf.seek(0)
         return buf.read()
 
-    def list_voices(self) -> list[dict]:
-        return []
+    def list_voices(self, **kwargs) -> list[dict]:
+        self._load_model()
+        if not self._model or not self._model.speaker_manager:
+            return []
+            
+        voices = []
+        for name in self._model.speaker_manager.speakers.keys():
+            voices.append({"id": name, "name": name, "gender": "N", "language": "en"})
+        return voices
