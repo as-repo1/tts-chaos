@@ -1,283 +1,175 @@
-# TTS Chaos — Step-by-Step Implementation Guide
+# TTS Chaos — Implementation Notes
 
-Every change is listed in execution order. Complete each step fully before moving to the next.
+This guide exists to explain the repository’s engineering shape in practical, maintainer-friendly terms. It is the “how do I reason about this codebase?” document.
 
 ---
 
-## PHASE 1 — Real Engine Layer
+## 1. Current runtime architecture
 
-### Step 1.1 — Update `pyproject.toml`
+The application is organized around four major layers:
 
-**File:** `/tts-chaos/pyproject.toml` ← CREATE NEW
+1. API layer
+   - [backend/app/api/routes.py](../backend/app/api/routes.py)
+   - [backend/app/api/models_router.py](../backend/app/api/models_router.py)
 
-Replace or create with proper project metadata and dependency groups:
+2. Service layer
+   - [backend/app/services/generator.py](../backend/app/services/generator.py)
+   - [backend/app/services/model_manager.py](../backend/app/services/model_manager.py)
+   - [backend/app/services/model_selector.py](../backend/app/services/model_selector.py)
+   - [backend/app/services/batch_generator.py](../backend/app/services/batch_generator.py)
 
-```toml
-[project]
-name = "tts-chaos"
-version = "0.1.0"
-requires-python = ">=3.11"
-dependencies = [
-    "fastapi>=0.110.0",
-    "uvicorn[standard]>=0.29.0",
-    "pydantic>=2.6.0",
-    "aiosqlite>=0.20.0",
-    "httpx>=0.27.0",
-    "sse-starlette>=2.0.0",
-    "huggingface-hub>=0.22.0",
-    "python-multipart>=0.0.9",
-]
+3. Persistence layer
+   - [backend/app/db/store.py](../backend/app/db/store.py)
 
-[project.optional-dependencies]
-kokoro = ["kokoro-onnx>=0.3.0", "soundfile>=0.12.1"]
-piper = ["piper-tts>=1.2.0"]
-xtts = ["TTS>=0.22.0", "torch>=2.2.0"]
-edge = ["edge-tts>=6.1.9"]
-audio = ["pydub>=0.25.1"]
-all = ["tts-chaos[kokoro,piper,edge,audio]"]
+4. Frontend shell
+   - [frontend/index.html](../frontend/index.html)
+   - [frontend/static/app.js](../frontend/static/app.js)
+   - [frontend/static/app.css](../frontend/static/app.css)
 
-[build-system]
-requires = ["setuptools>=70"]
-build-backend = "setuptools.backends.legacy:build"
+---
 
-[tool.setuptools.packages.find]
-where = ["."]
-include = ["backend*"]
-```
+## 2. Relevant runtime entrypoints
 
-**Install:**
+### FastAPI app bootstrap
+
+The main app object is created in [backend/app/main.py](../backend/app/main.py). This file is the best place to understand:
+
+- startup and shutdown lifecycle
+- middleware config
+- static file mounts
+- health and system info endpoints
+- environment-dependent runtime defaults
+
+### Health and status endpoints
+
+The route layer explicitly exposes:
+
+- `GET /api/health`
+- `GET /api/system/info`
+
+This is the fastest verification path when the backend is running in any environment.
+
+---
+
+## 3. Engine model
+
+The engine abstraction is implemented under [backend/app/services/engines](../backend/app/services/engines):
+
+- `base.py` defines the common contract
+- `edge_tts_engine.py` gives the cloud fallback interface
+- `kokoro.py` gives the local ONNX-oriented path
+- `piper.py` handles local Piper model loading patterns
+- `xtts_engine.py` provides the higher-cost cloning-oriented branch
+
+The selection and runtime suitability checks are centralized through [backend/app/services/model_manager.py](../backend/app/services/model_manager.py).
+
+---
+
+## 4. Persistence behavior
+
+Voice records are stored in SQLite, with metadata written by the async DB helper functions in [backend/app/db/store.py](../backend/app/db/store.py).
+
+The schema is intentionally small and records the minimal shape needed to recover the audio asset and its metadata later:
+
+- `voice_name`
+- `language`
+- `style`
+- `text`
+- `model_id`
+- `voice_id`
+- `speed`
+- `pitch`
+- `file_path`
+- `file_size`
+- `duration_sec`
+- `output_format`
+- `created_at`
+
+The route layer and batch layer both assume this persistence contract, so any future refactor should preserve it.
+
+---
+
+## 5. Document and batch processing notes
+
+The document-to-audio workflow is routed through:
+
+- [backend/app/api/routes.py](../backend/app/api/routes.py)
+- [backend/app/services/batch_generator.py](../backend/app/services/batch_generator.py)
+- [backend/app/services/document_parser.py](../backend/app/services/document_parser.py)
+
+This path currently behaves as a job-queue style MVP:
+
+1. parse content
+2. chunk it into smaller text spans
+3. synthesize each chunk
+4. merge the output with `ffmpeg`
+5. save the final merged audio asset
+6. write a record to the voice library
+
+This is the most operationally sensitive part of the app and should be treated as such during future maintenance.
+
+---
+
+## 6. Deployment shape
+
+The repo now supports two practical deployment modes:
+
+### Local Python runtime
+
 ```bash
-pip install -e ".[all]"
-# For XTTS (large, optional):
-pip install -e ".[xtts]"
+python -m venv .venv
+source .venv/bin/activate
+pip install -e .
+uvicorn backend.app.main:app --host 0.0.0.0 --port 2002
 ```
+
+### Docker runtime
+
+```bash
+docker compose up --build -d
+```
+
+The Docker deployment is the preferred self-hosted baseline.
 
 ---
 
-### Step 1.2 — Create Engine Base Interface
+## 7. Production-readiness notes
 
-**File:** `backend/app/services/engines/base.py` ← CREATE NEW
+The current production pass has already improved the repo by making the startup surface more deterministic:
 
-```python
-from __future__ import annotations
-from abc import ABC, abstractmethod
-from pathlib import Path
+- environment variables now control runtime exposure
+- the container no longer depends on a missing `requirements.txt`
+- the FastAPI app has a safer origin posture by default
+- startup-time imports are now compatible with the expected persistence interface
 
-class TTSEngine(ABC):
-    """Abstract contract every TTS engine must implement."""
-
-    name: str           # machine identifier, e.g. "kokoro"
-    display_name: str   # human label, e.g. "Kokoro 82M"
-    languages: list[str]
-    quality_score: int  # 0–100, used by auto-selector
-    supports_styles: list[str]
-
-    @abstractmethod
-    def is_available(self) -> bool:
-        """Return True if the engine can be used right now."""
-        ...
-
-    @abstractmethod
-    def generate(
-        self,
-        text: str,
-        voice_id: str = "default",
-        speed: float = 1.0,
-        pitch: float = 0.0,
-        language: str = "en",
-    ) -> bytes:
-        """Return raw WAV bytes (PCM 16-bit, mono or stereo)."""
-        ...
-
-    def list_voices(self) -> list[dict]:
-        """Return list of {id, name, gender, language} dicts."""
-        return []
-```
-
-**Also create:** `backend/app/services/engines/__init__.py` (empty)
+Those are the kinds of changes that matter the most when the project is handed to a future maintainer or operator.
 
 ---
 
-### Step 1.3 — Implement Edge-TTS Engine (First, No Download)
+## 8. Maintainer checklist
 
-**File:** `backend/app/services/engines/edge_tts_engine.py` ← CREATE NEW
+If you are debugging a future issue, read in this order:
 
-```python
-from __future__ import annotations
-import asyncio, io
-from .base import TTSEngine
+1. [backend/app/main.py](../backend/app/main.py)
+2. [backend/app/api/routes.py](../backend/app/api/routes.py)
+3. [backend/app/api/models_router.py](../backend/app/api/models_router.py)
+4. [backend/app/db/store.py](../backend/app/db/store.py)
+5. [backend/app/services/model_manager.py](../backend/app/services/model_manager.py)
+6. [backend/app/services/batch_generator.py](../backend/app/services/batch_generator.py)
 
-class EdgeTTSEngine(TTSEngine):
-    name = "edge-tts"
-    display_name = "Edge TTS (Cloud)"
-    languages = ["en", "fr", "de", "es", "ja", "zh", "ar", "pt", "it", "ko"]
-    quality_score = 70
-    supports_styles = ["neutral", "cheerful", "sad", "angry", "fearful"]
-
-    _VOICE_MAP = {
-        "en": "en-US-JennyNeural",
-        "fr": "fr-FR-DeniseNeural",
-        "de": "de-DE-KatjaNeural",
-        "es": "es-ES-ElviraNeural",
-        "ja": "ja-JP-NanamiNeural",
-        "zh": "zh-CN-XiaoxiaoNeural",
-    }
-
-    def is_available(self) -> bool:
-        try:
-            import edge_tts  # noqa: F401
-            return True
-        except ImportError:
-            return False
-
-    def generate(self, text: str, voice_id: str = "auto", speed: float = 1.0,
-                 pitch: float = 0.0, language: str = "en") -> bytes:
-        import edge_tts
-
-        voice = voice_id if voice_id != "auto" else self._VOICE_MAP.get(language, "en-US-JennyNeural")
-        rate_str = f"+{int((speed - 1.0) * 100)}%" if speed >= 1.0 else f"-{int((1.0 - speed) * 100)}%"
-        pitch_str = f"+{int(pitch)}Hz" if pitch >= 0 else f"{int(pitch)}Hz"
-
-        async def _run() -> bytes:
-            buf = io.BytesIO()
-            communicate = edge_tts.Communicate(text, voice, rate=rate_str, pitch=pitch_str)
-            async for chunk in communicate.stream():
-                if chunk["type"] == "audio":
-                    buf.write(chunk["data"])
-            return buf.getvalue()
-
-        return asyncio.run(_run())
-
-    def list_voices(self) -> list[dict]:
-        return [
-            {"id": "en-US-JennyNeural", "name": "Jenny (US)", "gender": "F", "language": "en"},
-            {"id": "en-US-GuyNeural", "name": "Guy (US)", "gender": "M", "language": "en"},
-            {"id": "en-GB-SoniaNeural", "name": "Sonia (GB)", "gender": "F", "language": "en"},
-            {"id": "fr-FR-DeniseNeural", "name": "Denise (FR)", "gender": "F", "language": "fr"},
-            {"id": "de-DE-KatjaNeural", "name": "Katja (DE)", "gender": "F", "language": "de"},
-        ]
-```
+That reading order gives a reliable “startup → route → storage → model discovery → background task” mental model.
 
 ---
 
-### Step 1.4 — Implement Kokoro Engine
+## 9. Known limitations worth preserving in memory
 
-**File:** `backend/app/services/engines/kokoro.py` ← CREATE NEW
+- `edge-tts` depends on the optional package installation being present.
+- Local models are not automatically validated beyond the manager’s availability checks.
+- Batch jobs are background tasks and should not be treated as a fully durable long-running service without a stronger job store.
+- UI state and runtime preferences are still limited compared to a full operational admin panel.
 
-```python
-from __future__ import annotations
-from pathlib import Path
-from .base import TTSEngine
+These are the main follow-up areas for the next engineering pass.
 
-MODELS_DIR = Path(__file__).resolve().parents[4] / "models" / "kokoro"
-
-class KokoroEngine(TTSEngine):
-    name = "kokoro-82m"
-    display_name = "Kokoro 82M"
-    languages = ["en"]
-    quality_score = 85
-    supports_styles = ["neutral", "soft", "dramatic"]
-
-    _VOICES = [
-        {"id": "af_heart", "name": "Heart (F)", "gender": "F", "language": "en"},
-        {"id": "af_sky",   "name": "Sky (F)",   "gender": "F", "language": "en"},
-        {"id": "am_adam",  "name": "Adam (M)",  "gender": "M", "language": "en"},
-        {"id": "am_michael","name":"Michael (M)","gender": "M", "language": "en"},
-        {"id": "bf_emma",  "name": "Emma (GB-F)","gender":"F", "language": "en"},
-        {"id": "bm_lewis", "name": "Lewis (GB-M)","gender":"M","language": "en"},
-    ]
-
-    def __init__(self):
-        self._model = None
-
-    def is_available(self) -> bool:
-        try:
-            import kokoro_onnx  # noqa: F401
-            model_file = MODELS_DIR / "kokoro-v1.0.onnx"
-            return model_file.exists()
-        except ImportError:
-            return False
-
-    def _load(self):
-        if self._model is None:
-            import kokoro_onnx
-            import soundfile as sf  # noqa: F401
-            self._kokoro = kokoro_onnx
-            self._model = kokoro_onnx.Kokoro(
-                str(MODELS_DIR / "kokoro-v1.0.onnx"),
-                str(MODELS_DIR / "voices.bin"),
-            )
-
-    def generate(self, text: str, voice_id: str = "af_heart", speed: float = 1.0,
-                 pitch: float = 0.0, language: str = "en") -> bytes:
-        import io, soundfile as sf
-        self._load()
-        samples, sample_rate = self._model.create(text, voice=voice_id, speed=speed, lang="en-us")
-        buf = io.BytesIO()
-        sf.write(buf, samples, sample_rate, format="WAV", subtype="PCM_16")
-        buf.seek(0)
-        return buf.read()
-
-    def list_voices(self) -> list[dict]:
-        return self._VOICES
-```
-
----
-
-### Step 1.5 — Implement Piper Engine
-
-**File:** `backend/app/services/engines/piper.py` ← CREATE NEW
-
-```python
-from __future__ import annotations
-import io, subprocess, wave
-from pathlib import Path
-from .base import TTSEngine
-
-MODELS_DIR = Path(__file__).resolve().parents[4] / "models" / "piper"
-
-class PiperEngine(TTSEngine):
-    name = "piper"
-    display_name = "Piper TTS"
-    languages = ["en", "de", "fr", "es", "nl", "it", "pt", "pl", "ru", "zh"]
-    quality_score = 78
-    supports_styles = ["neutral"]
-
-    def is_available(self) -> bool:
-        try:
-            import piper  # noqa: F401
-            return any(MODELS_DIR.glob("**/*.onnx"))
-        except ImportError:
-            return False
-
-    def generate(self, text: str, voice_id: str = "auto", speed: float = 1.0,
-                 pitch: float = 0.0, language: str = "en") -> bytes:
-        from piper import PiperVoice
-        # Find matching model for language
-        model_path = self._find_model(language)
-        if model_path is None:
-            raise RuntimeError(f"No Piper model installed for language '{language}'")
-
-        voice = PiperVoice.load(str(model_path))
-        buf = io.BytesIO()
-        with wave.open(buf, "wb") as wav:
-            wav.setnchannels(1)
-            wav.setsampwidth(2)
-            wav.setframerate(voice.config.sample_rate)
-            for audio_bytes in voice.synthesize_stream_raw(text, length_scale=1.0/speed):
-                wav.writeframes(audio_bytes)
-        buf.seek(0)
-        return buf.read()
-
-    def _find_model(self, language: str) -> Path | None:
-        # Prefer language-specific model, fall back to any installed
-        for onnx in MODELS_DIR.glob(f"{language}_*/*.onnx"):
-            return onnx
-        for onnx in MODELS_DIR.glob("**/*.onnx"):
-            return onnx
-        return None
-
-    def list_voices(self) -> list[dict]:
         voices = []
         for onnx in MODELS_DIR.glob("**/*.onnx"):
             lang = onnx.parent.name.split("_")[0]

@@ -33,6 +33,7 @@ class ModelInfo:
     download_url: str | None = None
     is_cloud: bool = False
     extra_files: list[tuple[str, str]] = field(default_factory=list)
+    rename_map: dict[str, str] = field(default_factory=dict)
 
 
 # ── Catalog ──────────────────────────────────────────────────────────────────
@@ -82,11 +83,12 @@ MODEL_CATALOG: list[ModelInfo] = [
         supported_styles=["neutral","soft","dramatic"],
         quality_score=88,
         use_cases=["narrator", "podcast", "audiobook"],
-        hf_repo="hexgrad/Kokoro-82M",
-        hf_filename="kokoro-v1.0.onnx",
+        hf_repo="onnx-community/Kokoro-82M-v1.0-ONNX",
+        hf_filename="model.onnx",
         extra_files=[
-            ("https://huggingface.co/hexgrad/Kokoro-82M/resolve/main/voices.bin", "voices.bin"),
+            ("https://github.com/thewh1teagle/kokoro-onnx/releases/download/model-files-v1.0/voices-v1.0.bin", "voices-v1.0.bin"),
         ],
+        rename_map={"model.onnx": "kokoro-v1.0.onnx", "voices-v1.0.bin": "voices.bin"},
     ),
     
     # --- Piper Models (High Quality) ---
@@ -238,6 +240,22 @@ MODEL_CATALOG: list[ModelInfo] = [
             ("https://huggingface.co/rhasspy/piper-voices/resolve/v1.0.0/hi/hi_IN/pratham/medium/hi_IN-pratham-medium.onnx.json", "hi_IN-pratham-medium.onnx.json"),
         ],
     ),
+    ModelInfo(
+        model_id="piper-bn-multi-medium",
+        display_name="Multi-Speaker (Bengali)",
+        engine="piper",
+        description="Medium quality Bengali voice with multiple speakers.",
+        size_mb=65,
+        languages=["bn"],
+        supported_styles=["neutral"],
+        quality_score=72,
+        use_cases=["narrator", "podcast"],
+        download_url="https://huggingface.co/rhasspy/piper-voices/resolve/v1.0.0/bn/bn_BD/multi/medium/bn_BD-multi-medium.onnx",
+        hf_filename="bn_BD-multi-medium.onnx",
+        extra_files=[
+            ("https://huggingface.co/rhasspy/piper-voices/resolve/v1.0.0/bn/bn_BD/multi/medium/bn_BD-multi-medium.onnx.json", "bn_BD-multi-medium.onnx.json"),
+        ],
+    ),
 ]
 
 
@@ -315,11 +333,19 @@ class ModelManager:
                 for url, dest_name in files_to_download:
                     await queue.put({"event": "download_started", "file": dest_name})
                     await _stream_file(url, dest_dir / dest_name, queue, model_id)
+                    
+                    if dest_name in info.rename_map:
+                        rename_to = info.rename_map[dest_name]
+                        (dest_dir / dest_name).rename(dest_dir / rename_to)
 
                 await queue.put({"event": "download_complete", "model_id": model_id})
                 self._scan_installed()
             except Exception as exc:
                 logger.exception("Download failed for %s", model_id)
+                if 'dest_dir' in locals() and dest_dir.exists():
+                    for f in dest_dir.iterdir():
+                        if f.is_file():
+                            f.unlink()
                 await queue.put({"event": "download_error", "error": str(exc)})
             finally:
                 self._progress.pop(model_id, None)
@@ -367,6 +393,8 @@ class ModelManager:
                     self._engines[model_id] = inst
             except Exception:
                 logger.debug("Engine %s not available", model_id, exc_info=True)
+                
+        logger.info("Scanning engines: found %s", list(self._engines.keys()))
 
     def _load_engine(self, model_id: str):
         self._scan_installed()

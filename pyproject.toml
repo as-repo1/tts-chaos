@@ -14,6 +14,13 @@ dependencies = [
     "pypdf>=4.2.0",
     "EbookLib>=0.18",
     "beautifulsoup4>=4.12.0",
+    "numpy>=1.26.0",
+    "pysrt>=1.1.2",
+    "feedparser>=6.0.11",
+    "sentence-transformers>=2.5.1",
+    "piper-tts>=1.2.0",
+    "transformers>=4.38.0",
+    "torch>=2.2.0",
 ]
 
 [project.optional-dependencies]
@@ -22,7 +29,7 @@ piper = ["piper-tts>=1.2.0"]
 xtts = ["TTS>=0.22.0", "torch>=2.2.0"]
 edge = ["edge-tts>=6.1.9"]
 audio = ["pydub>=0.25.1"]
-all = ["tts-chaos[kokoro,piper,edge,audio]"]
+all = ["tts-chaos[kokoro,piper,edge,audio,xtts]"]
 
 [build-system]
 requires = ["setuptools>=70"]

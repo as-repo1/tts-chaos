@@ -1,194 +1,170 @@
 # 🎙️ TTS Chaos — AI Voice Studio
 
-A full-stack, self-hosted Text-to-Speech studio built with **FastAPI** (backend) and **vanilla HTML/CSS/JS** (frontend). Browse, download, and manage TTS models directly from the UI, then synthesize voices from text with a single click.
+TTS Chaos is a self-hosted, browser-first text-to-speech studio built with FastAPI and vanilla HTML/CSS/JS. It exposes a small REST API, a model catalog and download workflow, a SQLite-backed voice library, and a hybrid runtime that can use cloud voices (Edge-TTS) or locally installed models.
 
 ---
 
-## ✨ Features
+## ✨ What this repo does
 
-| Feature | Description |
-|---|---|
-| **Real TTS Engines** | Kokoro-82M · Piper TTS · Coqui XTTS-v2 · Edge-TTS (cloud fallback) |
-| **Auto Model Selector** | Picks the best installed model per language, style, and quality |
-| **In-App Downloads** | Browse the model catalog and download models with real-time progress |
-| **Voice Library** | All generated voices saved, playable inline, and downloadable |
-| **Premium UI** | Glassmorphism dark-mode SPA with animated waveform visualizer |
-| **REST API** | Full JSON API — every feature is accessible programmatically |
+- Generates audio from text using a pluggable engine abstraction
+- Supports cloud fallback with Edge-TTS and local engines for Kokoro, Piper, and XTTS
+- Lets users browse model availability, download progress, and recommended model selection
+- Persists voice records in SQLite and streams saved audio files back to the browser
+- Ships with a Docker-first deployment shape for self-hosting
 
 ---
 
-## 🗂️ Project Structure
+## 🗂️ Current project structure
 
-```
+```text
 tts-chaos/
-├── README.md                   ← you are here
-├── pyproject.toml              ← Python project config + dependencies
-├── docs/                       ← Documentation folder
-│   ├── pipeline.md             ← CI/CD and data flow pipeline
-│   ├── implementation.md       ← step-by-step development guide
-│   └── workdone.md             ← record of completed tasks
-│
+├── README.md
+├── pyproject.toml
+├── Dockerfile
+├── docker-compose.yml
 ├── backend/
-│   ├── __init__.py
 │   └── app/
-│       ├── main.py             ← FastAPI app entrypoint + lifespan
+│       ├── main.py
 │       ├── api/
-│       │   ├── __init__.py
-│       │   ├── routes.py       ← Voice CRUD endpoints
-│       │   ├── models_router.py← Model catalog + download endpoints
-│       │   └── events.py       ← SSE (Server-Sent Events) streams
-│       ├── services/
-│       │   ├── __init__.py
-│       │   ├── generator.py    ← TTS dispatch + WAV writer
-│       │   ├── model_selector.py← Smart auto-selection logic
-│       │   ├── model_manager.py ← Download / install / delete
-│       │   └── engines/
-│       │       ├── base.py     ← Abstract TTSEngine interface
-│       │       ├── kokoro.py   ← Kokoro-82M (ONNX)
-│       │       ├── piper.py    ← Piper TTS
-│       │       ├── xtts.py     ← Coqui XTTS-v2
-│       │       └── edge_tts_engine.py ← Edge-TTS (cloud)
-│       └── db/
-│           ├── __init__.py
-│           └── store.py        ← SQLite via aiosqlite
-│
+│       │   ├── routes.py
+│       │   └── models_router.py
+│       ├── db/
+│       │   └── store.py
+│       └── services/
+│           ├── batch_generator.py
+│           ├── document_parser.py
+│           ├── generator.py
+│           ├── model_manager.py
+│           ├── model_selector.py
+│           └── engines/
+│               ├── base.py
+│               ├── edge_tts_engine.py
+│               ├── kokoro.py
+│               ├── piper.py
+│               └── xtts_engine.py
 ├── frontend/
-│   ├── index.html              ← SPA shell (3 tabs)
+│   ├── index.html
 │   └── static/
-│       ├── app.css             ← Glassmorphism design system
-│       └── app.js              ← Modular vanilla JS
-│
-├── models/                     ← Downloaded model files (auto-created)
-│   ├── kokoro/
-│   ├── piper/
-│   └── xtts/
-│
-└── generated_audio/            ← Synthesized WAV/MP3 files (auto-created)
+│       ├── app.css
+│       └── app.js
+├── docs/
+│   ├── implementation.md
+│   ├── pipeline.md
+│   └── workdone.md
+├── models/
+├── generated_audio/
+└── backend/app/data/voices.db
 ```
 
 ---
 
-## 🚀 Quick Start
+## 🚀 Quick start
 
 ### 1. Prerequisites
 
 - Python 3.11+
-- `uv` package manager (recommended) or `pip`
-- Optional: NVIDIA GPU + CUDA for XTTS acceleration
-- Optional: `ffmpeg` for MP3 export
+- `pip` or `uv`
+- `ffmpeg` for document/media processing and audio composition
+- Optional: GPU-enabled Python environment for heavier XTTS work
 
-### 2. Install
-
-```bash
-git clone https://github.com/yourusername/tts-chaos.git
-cd tts-chaos
-
-# Using Docker (Recommended)
-docker-compose up -d
-
-# OR Manual Setup
-uv venv .venv
-source .venv/bin/activate
-uv pip install -r requirements.txt
-```
-
-### 3. Run
+### 2. Install and run locally
 
 ```bash
+python -m venv .venv
 source .venv/bin/activate
-uvicorn backend.app.main:app --reload --host 0.0.0.0 --port 2002
+pip install -e .
+uvicorn backend.app.main:app --host 0.0.0.0 --port 2002
 ```
 
-2. Open `http://localhost:2002` in your browser.
+### 3. Run with Docker
 
-### 4. First Steps
-
-1. Click the **Models** tab
-2. Find **Edge-TTS** (no download — cloud) and click **Activate**
-3. Switch to the **Studio** tab
-4. Type your text and click **Create Voice**
-5. Check the **Library** tab to play and download your voice
-
----
-
-## 🔌 API Reference
-
-Base URL: `http://localhost:2002`
-
-### Voice Endpoints
-
-| Method | Path | Description |
-|---|---|---|
-| `POST` | `/api/voice` | Create a new voice |
-| `GET` | `/api/voices` | List all voices (pagination supported) |
-| `GET` | `/api/voices/{id}/audio` | Stream audio (supports Range requests) |
-| `DELETE` | `/api/voices/{id}` | Delete voice + audio file |
-
-**POST /api/voice — Request Body**
-```json
-{
-  "text": "Hello from TTS Chaos",
-  "voice_name": "my-voice",
-  "language": "en",
-  "style": "neutral",
-  "model_id": null,
-  "voice_id": "af_heart",
-  "speed": 1.0,
-  "pitch": 0.0,
-  "output_format": "wav"
-}
+```bash
+docker compose up --build -d
 ```
 
-### Model Endpoints
+Then open the app at `http://localhost:2002`.
 
-| Method | Path | Description |
-|---|---|---|
-| `GET` | `/api/models/catalog` | All known models with install status |
-| `GET` | `/api/models/installed` | Installed models only |
-| `POST` | `/api/models/download/{model_id}` | Start background download |
-| `GET` | `/api/models/download/{model_id}/progress` | SSE download progress stream |
-| `DELETE` | `/api/models/{model_id}` | Remove installed model |
-| `GET` | `/api/models/{model_id}/voices` | List available voices for model |
-| `GET` | `/api/models/recommend` | Auto-selector recommendation |
+### 4. Environment variables
 
----
-
-## 🤖 Supported TTS Models
-
-| Model | Engine | Size | Languages | GPU |
-|---|---|---|---|---|
-| **Kokoro-82M** | kokoro-onnx | ~350 MB | English | Optional |
-| **Piper (15+ Voices)** | piper-tts | ~60-120 MB | English, French, German, Hindi, etc. | CPU only |
-| **Coqui XTTS-v2** | TTS library | ~2.1 GB | 17 langs | Recommended |
-| **Edge-TTS** | edge-tts | 0 MB | 60+ langs (incl. Bengali) | None (cloud) |
-
----
-
-## ⚙️ Configuration
-
-All configuration is via environment variables (or `.env` file):
+The runtime now reads the following defaults from the environment:
 
 ```env
 HOST=0.0.0.0
 PORT=2002
-MODELS_DIR=./models
-AUDIO_DIR=./generated_audio
-DB_PATH=./backend/app/data/voices.db
-DEFAULT_MODEL=auto
-DEFAULT_LANGUAGE=en
-DEFAULT_FORMAT=wav
-MAX_CONCURRENT_GENERATIONS=4
+ENABLE_DOCS=false
+CORS_ORIGINS=http://localhost:2002,http://127.0.0.1:2002
 ```
+
+This keeps the app self-hosting friendly and avoids overexposing the API stack.
 
 ---
 
-## 📋 Roadmap
+## 🔌 Current API surface
 
-- [x] Phase 1: Real engine layer (Edge-TTS, Kokoro, Piper, XTTS)
-- [x] Phase 2: Model management API + SSE progress
-- [x] Phase 3: Premium frontend (glassmorphism SPA)
-- [x] Phase 4: Batch generation + voice cloning
-- [x] Phase 5: Docker packaging
+Base URL: `http://localhost:2002`
+
+### Health and system
+
+| Method | Path | Description |
+|---|---|---|
+| `GET` | `/api/health` | Simple health probe |
+| `GET` | `/api/system/info` | Runtime metadata, installed model IDs, disk usage |
+
+### Voice generation and library
+
+| Method | Path | Description |
+|---|---|---|
+| `POST` | `/api/voice` | Generate a single voice |
+| `POST` | `/api/voice/batch` | Batch voice generation from a list of texts |
+| `POST` | `/api/voice/clone` | Clone a voice from uploaded reference audio |
+| `POST` | `/api/voice/document` | Queue a document-to-audio batch job |
+| `GET` | `/api/voices` | List stored voices |
+| `GET` | `/api/voices/search` | Search stored voices |
+| `GET` | `/api/voices/stats` | Inventory and storage statistics |
+| `GET` | `/api/voices/{voice_id}/audio` | Stream saved audio |
+| `DELETE` | `/api/voices/{voice_id}` | Remove a stored voice record |
+| `GET` | `/api/voice/document/{job_id}/progress` | Poll a document job status |
+| `POST` | `/api/voice/document/{job_id}/action` | Skip/cancel a document job |
+
+### Model catalog operations
+
+| Method | Path | Description |
+|---|---|---|
+| `GET` | `/api/models/catalog` | Full model catalog |
+| `GET` | `/api/models/installed` | Installed models only |
+| `POST` | `/api/models/download/{model_id}` | Start a model download job |
+| `GET` | `/api/models/download/{model_id}/progress` | SSE progress stream |
+| `DELETE` | `/api/models/{model_id}` | Delete an installed local model |
+| `GET` | `/api/models/{model_id}/voices` | List engine voices |
+| `GET` | `/api/models/recommend` | Recommend a model from the installed set |
+
+---
+
+## 🤖 Current model posture
+
+- `edge-tts` is the cloud fallback and is treated as always available if the optional dependency is present.
+- `kokoro-82m`, `piper-*`, and `xtts-v2` are model-catalog based and are instantiated only when their runtime requirements exist.
+- Model download progress is streamed through a queue-backed SSE endpoint.
+- Disk usage is surfaced through the system info route.
+
+---
+
+## ⚙️ Production notes
+
+The current production-readiness pass makes the app easier to deploy and reason about:
+
+- the FastAPI app is configured through environment variables
+- the Docker image installs from the project metadata instead of a missing `requirements.txt`
+- the DB path and asset directories are mounted and created predictably
+- the app no longer relies on a permissive wildcard CORS origin in the default runtime shape
+
+---
+
+## 📋 Documentation map
+
+- [docs/implementation.md](docs/implementation.md) — engineering walk-through and current architecture detail
+- [docs/pipeline.md](docs/pipeline.md) — request/data processing flow and deployment model
+- [docs/workdone.md](docs/workdone.md) — milestone log and progress notes
 
 ---
 

@@ -17,6 +17,19 @@ def parse_document(file_bytes: bytes, filename: str) -> str:
     if ext == 'txt':
         return file_bytes.decode('utf-8', errors='replace')
         
+    elif ext in ('md', 'markdown'):
+        import re
+        text = file_bytes.decode('utf-8', errors='replace')
+        # Strip markdown syntax for better TTS reading
+        text = re.sub(r'\[([^\]]+)\]\([^\)]+\)', r'\1', text) # links
+        text = re.sub(r'(\*\*|__)(.*?)\1', r'\2', text) # bold
+        text = re.sub(r'(\*|_)(.*?)\1', r'\2', text) # italics
+        text = re.sub(r'#+\s+', '', text) # headers
+        text = re.sub(r'```.*?```', '', text, flags=re.DOTALL) # code blocks
+        text = re.sub(r'`(.*?)`', r'\1', text) # inline code
+        text = re.sub(r'>\s+', '', text) # blockquotes
+        return text
+        
     elif ext == 'pdf':
         try:
             reader = PdfReader(io.BytesIO(file_bytes))
@@ -32,29 +45,26 @@ def parse_document(file_bytes: bytes, filename: str) -> str:
             
     elif ext == 'epub':
         try:
-            # ebooklib expects a file path, but we can write to a temp file
             import tempfile
             import os
-            
+
             with tempfile.NamedTemporaryFile(delete=False, suffix='.epub') as temp_file:
                 temp_file.write(file_bytes)
                 temp_path = temp_file.name
-                
-            book = epub.read_epub(temp_path)
-            
-            chapters = []
-            for item in book.get_items():
-                if item.get_type() == ebooklib.ITEM_DOCUMENT:
-                    content = item.get_content()
-                    soup = BeautifulSoup(content, 'html.parser')
-                    # Extract text, stripping html
-                    text = soup.get_text(separator='\n\n', strip=True)
-                    if text:
-                        chapters.append(text)
-                        
-            # Clean up temp file
-            os.remove(temp_path)
-            
+
+            try:
+                book = epub.read_epub(temp_path)
+
+                chapters = []
+                for item in book.get_items():
+                    if item.get_type() == ebooklib.ITEM_DOCUMENT:
+                        content = item.get_content()
+                        soup = BeautifulSoup(content, 'html.parser')
+                        text = soup.get_text(separator='\n\n', strip=True)
+                        if text:
+                            chapters.append(text)
+            finally:
+                os.unlink(temp_path)
             return "\n\n---\n\n".join(chapters)
             
         except Exception as e:

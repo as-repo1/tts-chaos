@@ -1,11 +1,12 @@
 import logging
+import os
 import time
 from contextlib import asynccontextmanager
 from pathlib import Path
 
-from fastapi import FastAPI, Request
+from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import HTMLResponse, JSONResponse
+from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
 
 from backend.app.api.routes import router as voice_router
@@ -18,6 +19,17 @@ logger = logging.getLogger("tts-chaos")
 
 APP_ROOT = Path(__file__).resolve().parents[2]
 FRONTEND_DIR = APP_ROOT / "frontend"
+HOST = os.getenv("HOST", "0.0.0.0")
+PORT = int(os.getenv("PORT", "2002"))
+ENABLE_DOCS = os.getenv("ENABLE_DOCS", "true").lower() == "true"
+CORS_ORIGINS = [
+    origin.strip()
+    for origin in os.getenv(
+        "CORS_ORIGINS",
+        "http://localhost:2002,http://127.0.0.1:2002",
+    ).split(",")
+    if origin.strip()
+]
 _START_TIME = time.time()
 
 
@@ -30,14 +42,27 @@ async def lifespan(app: FastAPI):
     logger.info("TTS Chaos shutting down")
 
 
-app = FastAPI(title="TTS Chaos", version="2.0.0", lifespan=lifespan)
+app = FastAPI(
+    title="TTS Chaos",
+    version="2.0.0",
+    lifespan=lifespan,
+    docs_url="/docs" if ENABLE_DOCS else None,
+    redoc_url="/redoc" if ENABLE_DOCS else None,
+)
 
-# CORS
+from fastapi import Request
+from fastapi.responses import JSONResponse
+
+@app.exception_handler(Exception)
+async def global_exception_handler(request: Request, exc: Exception):
+    logger.exception("Unhandled error on %s %s", request.method, request.url.path)
+    return JSONResponse(status_code=500, content={"detail": "Internal server error"})
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=CORS_ORIGINS,
     allow_credentials=True,
-    allow_methods=["*"],
+    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     allow_headers=["*"],
 )
 
@@ -61,6 +86,11 @@ async def system_info():
     }
 
 
-@app.get("/", response_class=HTMLResponse)
-def serve_frontend():
-    return HTMLResponse((FRONTEND_DIR / "index.html").read_text())
+@app.get("/{full_path:path}", response_class=HTMLResponse)
+def serve_frontend(full_path: str):
+    if full_path.startswith("api/") or full_path.startswith("static/"):
+        return JSONResponse(status_code=404, content={"detail": "Not Found"})
+    html_path = FRONTEND_DIR / "index.html"
+    if not html_path.exists():
+        return HTMLResponse("<h1>Frontend not built or missing index.html</h1>", status_code=404)
+    return HTMLResponse(html_path.read_text())

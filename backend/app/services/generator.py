@@ -5,7 +5,7 @@ import struct
 import wave
 import logging
 from pathlib import Path
-from datetime import datetime
+from datetime import datetime, timezone
 
 logger = logging.getLogger(__name__)
 
@@ -47,6 +47,10 @@ def generate_audio_asset(
 
     try:
         raw_audio = engine.generate(text=text, voice_id=voice_id, speed=speed,
+                                     pitch=pitch, language=language, style=style)
+    except TypeError:
+        # Fallback if engine does not accept style kwarg
+        raw_audio = engine.generate(text=text, voice_id=voice_id, speed=speed,
                                      pitch=pitch, language=language)
     except Exception as exc:
         logger.exception("TTS engine '%s' failed during generation", model_id)
@@ -55,7 +59,7 @@ def generate_audio_asset(
     if not raw_audio or len(raw_audio) < 100:
         raise RuntimeError("Engine returned empty or invalid audio data")
 
-    timestamp = datetime.utcnow().strftime("%Y%m%d%H%M%S%f")
+    timestamp = datetime.now(timezone.utc).strftime("%Y%m%d%H%M%S%f")
     safe_name = "".join(c if c.isalnum() or c in ("_", "-") else "_" for c in voice_name)
     file_name = f"{safe_name}_{timestamp}.{output_format}"
     file_path = AUDIO_DIR / file_name
@@ -100,7 +104,7 @@ def generate_cloned_audio_asset(
         logger.exception("Cloning failed")
         raise RuntimeError(f"Voice cloning failed: {exc}")
 
-    timestamp = datetime.utcnow().strftime("%Y%m%d%H%M%S%f")
+    timestamp = datetime.now(timezone.utc).strftime("%Y%m%d%H%M%S%f")
     safe_name = "".join(c if c.isalnum() or c in ("_", "-") else "_" for c in voice_name)
     file_name = f"{safe_name}_{timestamp}.wav"
     file_path = AUDIO_DIR / file_name
@@ -116,3 +120,14 @@ def generate_cloned_audio_asset(
         "duration_sec": duration,
         "output_format": "wav"
     }
+
+def delete_audio_file(file_path: str) -> None:
+    """Delete an audio file from disk. Called as a background task."""
+    try:
+        p = Path(file_path)
+        if p.exists() and p.is_file():
+            p.unlink()
+            logger.info("Deleted audio file: %s", file_path)
+    except Exception:
+        logger.warning("Failed to delete audio file: %s", file_path, exc_info=True)
+

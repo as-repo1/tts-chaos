@@ -125,8 +125,13 @@ function switchTab(tabId) {
   if (content) content.classList.add('active');
 
   if (tabId === 'models') renderModels();
-  if (tabId === 'library') renderLibrary();
-  if (tabId === 'dashboard') renderDashboard();
+  if (tabId === 'library') {
+    renderLibrary();
+    renderDashboard();
+  }
+  if (tabId === 'director') {
+    // any director init
+  }
 }
 
 document.querySelectorAll('.nav-item[data-tab]').forEach(item => {
@@ -150,11 +155,30 @@ window.addEventListener('keydown', (e) => {
   if (e.ctrlKey && e.key === '2') { e.preventDefault(); switchTab('models'); }
   if (e.ctrlKey && e.key === '3') { e.preventDefault(); switchTab('library'); }
   if (e.ctrlKey && e.key === '4') { e.preventDefault(); switchTab('cloning'); }
-  if (e.ctrlKey && e.key === '5') { e.preventDefault(); switchTab('dashboard'); }
 
   if (e.key === '?') {
     e.preventDefault();
-    document.getElementById('shortcuts-overlay').classList.toggle('open');
+    document.getElementById('shortcuts-overlay').classList.add('open');
+  }
+
+  if (e.key === 'Escape') {
+    e.preventDefault();
+    document.getElementById('settings-overlay')?.classList.remove('open');
+    document.getElementById('settings-drawer')?.classList.remove('open');
+    document.getElementById('shortcuts-overlay')?.classList.remove('open');
+  }
+
+  if (e.key === ' ' || e.key === 'Spacebar') {
+    e.preventDefault();
+    if (currentAudio) {
+      if (currentAudio.paused) currentAudio.play();
+      else currentAudio.pause();
+    }
+  }
+
+  if (e.ctrlKey && e.shiftKey && e.key.toLowerCase() === 'd') {
+    e.preventDefault();
+    window.open('/docs', '_blank');
   }
 });
 
@@ -275,6 +299,10 @@ form.addEventListener('submit', async (e) => {
   const text = textInput.value.trim();
   if (!text) return;
 
+  const reverb = document.getElementById('effect-reverb')?.classList.contains('active') || false;
+  const compressor = document.getElementById('effect-compressor')?.classList.contains('active') || false;
+  const eq = document.getElementById('effect-eq')?.classList.contains('active') || false;
+
   const basePayload = {
     voice_name: document.getElementById('voice-name').value,
     language: langSelect.value,
@@ -283,6 +311,10 @@ form.addEventListener('submit', async (e) => {
     speed: parseFloat(speedInput.value),
     pitch: parseFloat(pitchInput.value),
     output_format: State.settings.format,
+    style: typeof selectedStyle !== 'undefined' ? selectedStyle : 'neutral',
+    smart_style: document.getElementById('smart-style')?.classList.contains('active') || false,
+    chunking_strategy: document.getElementById('chunking-strategy')?.value || 'standard',
+    effects: { reverb, compressor, eq }
   };
 
   try {
@@ -292,7 +324,11 @@ form.addEventListener('submit', async (e) => {
       const res = await API.createBatch({ ...basePayload, texts: lines });
       Toast.show(`Generated ${res.generated} audio clips!`);
     } else {
-      await API.createVoice({ ...basePayload, text });
+      const result = await API.createVoice({ ...basePayload, text });
+      if (State.settings.autoplay && result.id) {
+        const audio = new Audio(`/api/voices/${result.id}/audio`);
+        audio.play().catch(() => {});
+      }
       Toast.show('Audio generated successfully!');
     }
 
@@ -412,16 +448,34 @@ function startSSEProgress(modelId) {
 let currentAudio = null;
 let currentWaveform = null;
 
+let libraryPage = 0;
+const PAGE_SIZE = 20;
+
 async function renderLibrary() {
   const q = document.getElementById('library-search').value;
   const model = document.getElementById('filter-model').value;
   const lang = document.getElementById('filter-lang').value;
+  
+  const filterModel = document.getElementById('filter-model');
+  if (filterModel && filterModel.options.length <= 1) {
+      const catalog = await API.getCatalog();
+      catalog.filter(m => m.is_installed).forEach(m => {
+          const opt = document.createElement('option');
+          opt.value = m.model_id;
+          opt.textContent = m.display_name;
+          filterModel.appendChild(opt);
+      });
+  }
 
+  const offset = libraryPage * PAGE_SIZE;
   const data = await API.searchVoices(q, model, lang);
   const list = document.getElementById('library-list');
   list.innerHTML = '';
 
-  if (data.voices.length === 0) {
+  const total = data.voices.length;
+  const paginatedVoices = data.voices.slice(offset, offset + PAGE_SIZE);
+
+  if (total === 0) {
     list.innerHTML = `
       <div class="empty-state">
         <div class="empty-icon">🎙️</div>
@@ -429,20 +483,31 @@ async function renderLibrary() {
         <p>Synthesize text in the Studio tab to see your generated voices here.</p>
       </div>
     `;
+    document.getElementById('library-pagination').innerHTML = '';
     return;
   }
 
-  data.voices.forEach(voice => {
+  paginatedVoices.forEach(voice => {
     const card = document.createElement('div');
     card.className = 'voice-card glass';
+    
+    let durationHtml = '';
+    if (voice.duration) {
+      durationHtml = `<span class="voice-meta-item">⏱️ ${formatDuration(voice.duration)}</span>`;
+    }
+
     card.innerHTML = `
       <div class="voice-row-top">
-        <div class="voice-title">${voice.voice_name}</div>
+        <div class="voice-title">
+          <button class="favorite-btn ${isFavorite(voice.id) ? 'active' : ''}" data-id="${voice.id}">★</button>
+          ${voice.voice_name}
+        </div>
         <div class="voice-meta">
           <span class="voice-meta-item">🤖 ${voice.model_id}</span>
           <span class="voice-meta-item">🗣️ ${voice.language.toUpperCase()}</span>
           <span class="voice-meta-item">⚡ ${voice.speed}x</span>
-          <span class="voice-meta-item">📅 ${new Date(voice.created_at).toLocaleTimeString()}</span>
+          ${durationHtml}
+          <span class="voice-meta-item">📅 ${new Date(voice.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}</span>
         </div>
       </div>
       <div class="voice-text">"${voice.text}"</div>
@@ -450,7 +515,8 @@ async function renderLibrary() {
         <button class="btn-icon play play-btn" data-url="/api/voices/${voice.id}/audio" data-id="${voice.id}">
           <svg width="16" height="16" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
         </button>
-        <div class="waveform" id="wf-${voice.id}">
+        <canvas class="waveform-canvas" id="wf-${voice.id}" width="400" height="60" style="display:none;"></canvas>
+        <div class="waveform" id="wf-anim-${voice.id}">
           <div class="waveform-bar"></div><div class="waveform-bar"></div>
           <div class="waveform-bar"></div><div class="waveform-bar"></div>
           <div class="waveform-bar"></div><div class="waveform-bar"></div>
@@ -467,25 +533,53 @@ async function renderLibrary() {
     list.appendChild(card);
   });
 
+  // Attach favorite handlers
+  document.querySelectorAll('.favorite-btn').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      const id = e.currentTarget.dataset.id;
+      toggleFavorite(id);
+      e.currentTarget.classList.toggle('active', isFavorite(id));
+    });
+  });
+
   // Attach playback handlers
+  let activeVisualizer = null;
   document.querySelectorAll('.play-btn').forEach(btn => {
     btn.addEventListener('click', (e) => {
       const url = e.currentTarget.dataset.url;
-      const wfId = `wf-${e.currentTarget.dataset.id}`;
+      const wfCanvas = document.getElementById(`wf-${e.currentTarget.dataset.id}`);
+      const wfAnim = document.getElementById(`wf-anim-${e.currentTarget.dataset.id}`);
 
       if (currentAudio) {
         currentAudio.pause();
-        if (currentWaveform) currentWaveform.classList.remove('active');
+        if (currentWaveform) {
+            currentWaveform.style.display = 'none';
+        }
+        if (activeVisualizer) activeVisualizer.stop();
+        document.querySelectorAll('.waveform-canvas').forEach(c => c.style.display = 'none');
+        document.querySelectorAll('.spectrogram-canvas').forEach(c => c.style.display = 'none');
+        document.querySelectorAll('.waveform').forEach(c => c.classList.remove('active'));
       }
 
       currentAudio = new Audio(url);
-      currentWaveform = document.getElementById(wfId);
+      currentAudio.crossOrigin = "anonymous";
+      
+      if (wfAnim) wfAnim.style.display = 'none';
+      wfCanvas.style.display = 'block';
+      currentWaveform = wfCanvas;
 
-      currentWaveform.classList.add('active');
+      const specCanvas = document.getElementById(`spec-${e.currentTarget.dataset.id}`);
+      if (specCanvas) specCanvas.style.display = 'block';
+
+      activeVisualizer = new WaveformVisualizer(wfCanvas, specCanvas);
+      activeVisualizer.connectAudio(currentAudio);
+      
       currentAudio.play();
 
       currentAudio.onended = () => {
-        currentWaveform.classList.remove('active');
+        wfCanvas.style.display = 'none';
+        if (specCanvas) specCanvas.style.display = 'none';
+        activeVisualizer.stop();
       };
     });
   });
@@ -502,6 +596,24 @@ async function renderLibrary() {
       }
     });
   });
+  
+  renderPagination(total, libraryPage);
+}
+
+function renderPagination(total, currentPage) {
+  const container = document.getElementById('library-pagination');
+  if (!container) return;
+  const totalPages = Math.ceil(total / PAGE_SIZE);
+  if (totalPages <= 1) { container.innerHTML = ''; return; }
+  let html = `<button class="pagination-btn" ${currentPage === 0 ? 'disabled' : ''} onclick="goToPage(${currentPage - 1})">← Prev</button>`;
+  html += `<span class="pagination-info">Page ${currentPage + 1} of ${totalPages}</span>`;
+  html += `<button class="pagination-btn" ${currentPage >= totalPages - 1 ? 'disabled' : ''} onclick="goToPage(${currentPage + 1})">Next →</button>`;
+  container.innerHTML = html;
+}
+
+window.goToPage = (page) => {
+  libraryPage = page;
+  renderLibrary();
 }
 
 // Search & Filter input debouncing
@@ -523,33 +635,13 @@ async function updateLibraryBadge() {
 async function renderDashboard() {
   const stats = await API.getStats();
 
-  document.getElementById('stat-total-voices').textContent = stats.total_voices;
-  document.getElementById('stat-total-duration').textContent = `${stats.total_duration_sec}s`;
-  document.getElementById('stat-disk-usage').textContent = `${stats.disk.audio_mb} MB`;
-  document.getElementById('stat-models-count').textContent = stats.installed_models;
-
-  // Storage breakdown
-  const storageEl = document.getElementById('storage-breakdown');
-  storageEl.innerHTML = `
-    <div style="display:flex; justify-content:space-between; font-size:13px; color:var(--text-secondary);">
-      <span>Downloaded Models:</span> <b>${stats.disk.models_mb} MB</b>
-    </div>
-    <div style="display:flex; justify-content:space-between; font-size:13px; color:var(--text-secondary);">
-      <span>Generated Audio Clips:</span> <b>${stats.disk.audio_mb} MB</b>
-    </div>
-  `;
-
-  // Models usage breakdown
-  const usageEl = document.getElementById('models-usage-breakdown');
-  if (stats.models_used.length === 0) {
-    usageEl.innerHTML = '<div style="font-size:13px; color:var(--text-tertiary);">No generation activity recorded yet.</div>';
-  } else {
-    usageEl.innerHTML = stats.models_used.map(m => `
-      <div style="display:flex; justify-content:space-between; font-size:13px; color:var(--text-secondary);">
-        <span>${m.model_id}:</span> <b>${m.cnt} clips</b>
-      </div>
-    `).join('');
-  }
+  const elVoices = document.getElementById('stat-total-voices');
+  const elDuration = document.getElementById('stat-total-duration');
+  const elDisk = document.getElementById('stat-disk-usage');
+  
+  if (elVoices) elVoices.textContent = stats.total_voices;
+  if (elDuration) elDuration.textContent = `${stats.total_duration_sec}s`;
+  if (elDisk) elDisk.textContent = `${stats.disk.audio_mb} MB`;
 }
 
 // ─── CLONING TAB LOGIC ─────────────────────────────────────────────────────
@@ -642,14 +734,7 @@ function closeSettings() {
   settingsDrawer.classList.remove('open');
 }
 
-settingFormat.value = State.settings.format;
 settingAutoplay.value = State.settings.autoplay.toString();
-
-settingFormat.addEventListener('change', (e) => {
-  State.settings.format = e.target.value;
-  localStorage.setItem('tts_format', e.target.value);
-  document.getElementById('format-tag').textContent = `Format: ${e.target.value.toUpperCase()}`;
-});
 
 settingAutoplay.addEventListener('change', (e) => {
   State.settings.autoplay = e.target.value === 'true';
@@ -666,7 +751,17 @@ document.getElementById('close-shortcuts').addEventListener('click', () => {
 
 // ─── INIT ──────────────────────────────────────────────────────────────────
 
+(function() {
+  const saved = localStorage.getItem('tts_theme') || 'default';
+  if (saved && saved !== 'default') {
+    document.documentElement.setAttribute('data-theme', saved);
+  }
+})();
+
 initStudio();
+initThemes();
+initStyles();
+initFormatOptions();
 
 // ─── BATCH DOCUMENT UPLOAD ──────────────────────────────────────────────────
 
@@ -693,6 +788,7 @@ if(documentUpload) {
     formData.append('style', 'neutral');
     formData.append('speed', document.getElementById('speed').value);
     formData.append('pitch', document.getElementById('pitch').value);
+    formData.append('chunking_strategy', document.getElementById('chunking-strategy').value || 'standard');
     
     const mId = document.getElementById('model-id').value;
     if(mId) formData.append('model_id', mId);
@@ -719,13 +815,155 @@ if(documentUpload) {
       startPollingBatchJob();
       
     } catch(err) {
-      showToast(err.message, 'error');
+      Toast.show(err.message, 'error');
       batchContainer.style.display = 'none';
     } finally {
       documentUpload.value = ''; // Reset
     }
   });
 }
+
+// ─── NEW PHASE 2/3 FEATURES ────────────────────────────────────────────────
+
+// Toggle switch logic
+document.querySelectorAll('.toggle-switch').forEach(ts => {
+  ts.addEventListener('click', () => ts.classList.toggle('active'));
+});
+
+// Director Tab Logic
+const characterList = document.getElementById('character-list');
+
+document.getElementById('add-character-btn')?.addEventListener('click', async () => {
+  const charDiv = document.createElement('div');
+  charDiv.className = 'form-group glass';
+  charDiv.style.padding = '12px';
+  charDiv.style.marginBottom = '8px';
+  charDiv.style.border = '1px solid var(--panel-border)';
+  
+  const nameInput = document.createElement('input');
+  nameInput.type = 'text';
+  nameInput.placeholder = 'Character Name (e.g. ALICE)';
+  nameInput.style.marginBottom = '8px';
+  nameInput.className = 'char-name-input';
+  
+  const modelSelect = document.createElement('select');
+  modelSelect.style.marginBottom = '8px';
+  modelSelect.innerHTML = '<option value="">Select Engine...</option>';
+  State.catalog.filter(m => m.is_installed).forEach(m => {
+    const opt = document.createElement('option');
+    opt.value = m.model_id;
+    opt.textContent = m.display_name;
+    modelSelect.appendChild(opt);
+  });
+  
+  const voiceSelect = document.createElement('select');
+  voiceSelect.innerHTML = '<option value="">Select Voice...</option>';
+  voiceSelect.className = 'char-voice-input';
+  
+  modelSelect.addEventListener('change', async () => {
+    voiceSelect.innerHTML = '<option value="">Loading...</option>';
+    const voices = await API.getModelVoices(modelSelect.value);
+    voiceSelect.innerHTML = '<option value="">Select Voice...</option>';
+    voices.forEach(v => {
+      const opt = document.createElement('option');
+      opt.value = v.id;
+      opt.textContent = v.name;
+      voiceSelect.appendChild(opt);
+    });
+  });
+  
+  const removeBtn = document.createElement('button');
+  removeBtn.textContent = 'Remove';
+  removeBtn.className = 'btn btn-secondary btn-sm';
+  removeBtn.style.marginTop = '8px';
+  removeBtn.onclick = () => charDiv.remove();
+  
+  charDiv.appendChild(nameInput);
+  charDiv.appendChild(modelSelect);
+  charDiv.appendChild(voiceSelect);
+  charDiv.appendChild(removeBtn);
+  
+  characterList.appendChild(charDiv);
+});
+
+document.getElementById('generate-scene-btn')?.addEventListener('click', async () => {
+  const charInputs = document.querySelectorAll('.char-name-input');
+  const voiceInputs = document.querySelectorAll('.char-voice-input');
+  
+  const characters = {};
+  for(let i = 0; i < charInputs.length; i++) {
+    const name = charInputs[i].value.trim();
+    const voice = voiceInputs[i].value;
+    if(name && voice) characters[name] = voice;
+  }
+  
+  const script = document.getElementById('director-script').value.trim();
+  if(!script) return Toast.show('Script is empty', 'error');
+  
+  const generateBtn = document.getElementById('generate-scene-btn');
+  generateBtn.disabled = true;
+  generateBtn.textContent = 'Generating...';
+  document.getElementById('director-waveform').style.display = 'flex';
+  
+  try {
+    const res = await fetch('/api/voice/scene', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({ characters, script })
+    });
+    if(!res.ok) {
+        let msg = 'Failed';
+        try { const err = await res.json(); msg = err.detail || msg; } catch(e){}
+        throw new Error(msg);
+    }
+    const data = await res.json();
+    Toast.show('Scene generated successfully!');
+    if(State.settings.autoplay && data.id) {
+        const audio = new Audio(`/api/voices/${data.id}/audio`);
+        audio.play().catch(() => {});
+    }
+    updateLibraryBadge();
+    switchTab('library');
+  } catch (err) {
+    Toast.show(err.message, 'error');
+  } finally {
+    generateBtn.disabled = false;
+    generateBtn.innerHTML = '<span>Generate Scene</span>';
+    document.getElementById('director-waveform').style.display = 'none';
+  }
+});
+
+// RSS Podcast Generator Logic
+document.getElementById('rss-generate-btn')?.addEventListener('click', async () => {
+  const url = document.getElementById('rss-url').value.trim();
+  if(!url) return Toast.show('Enter RSS URL', 'error');
+  
+  const btn = document.getElementById('rss-generate-btn');
+  btn.disabled = true;
+  btn.textContent = 'Starting...';
+  
+  try {
+    const summarize_content = document.getElementById('rss-summarize')?.checked || false;
+    const res = await fetch('/api/voice/rss', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({ url, summarize_content })
+    });
+    if(!res.ok) {
+        let msg = 'Failed';
+        try { const err = await res.json(); msg = err.detail || msg; } catch(e){}
+        throw new Error(msg);
+    }
+    Toast.show('RSS Podcast generation started!');
+    renderLibrary();
+    updateLibraryBadge();
+  } catch(err) {
+    Toast.show(err.message, 'error');
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'RSS Podcast';
+  }
+});
 
 function startPollingBatchJob() {
   if(batchPollInterval) clearInterval(batchPollInterval);
@@ -760,7 +998,9 @@ function startPollingBatchJob() {
         batchProgressText.textContent = `Completed successfully!`;
         batchProgressFill.style.width = `100%`;
         setTimeout(() => { batchContainer.style.display = 'none'; }, 3000);
-        api.getVoices(); // Refresh library
+        renderLibrary();
+        updateLibraryBadge();
+        Toast.show('Document audio generated successfully!');
       }
       else if(data.status === 'requires_action') {
         batchProgressText.textContent = `Error on chunk ${data.failed_chunk_idx || '?'}`;
@@ -792,4 +1032,238 @@ async function sendBatchAction(action) {
     headers: {'Content-Type': 'application/json'},
     body: JSON.stringify({action})
   });
+}
+
+// ─── NEW FEATURES ────────────────────────────────────────────────────────
+
+const THEMES = [
+  { id: 'default', name: 'Indigo Night', colors: ['#050507', '#6366f1', '#d946ef'] },
+  { id: 'gruvbox', name: 'Gruvbox', colors: ['#1d2021', '#d79921', '#b8bb26'] },
+  { id: 'tokyo-night', name: 'Tokyo Night', colors: ['#1a1b26', '#7aa2f7', '#bb9af7'] },
+  { id: 'nord', name: 'Nord', colors: ['#2e3440', '#88c0d0', '#b48ead'] },
+  { id: 'dark-nord', name: 'Dark Nord', colors: ['#1c1f26', '#81a1c1', '#b48ead'] },
+  { id: 'dracula', name: 'Dracula', colors: ['#282a36', '#bd93f9', '#ff79c6'] },
+  { id: 'retro', name: 'Retro Amber', colors: ['#0a0a0a', '#ffb000', '#ff6600'] },
+  { id: 'catppuccin', name: 'Catppuccin', colors: ['#1e1e2e', '#89b4fa', '#f5c2e7'] },
+];
+
+function initThemes() {
+  const saved = localStorage.getItem('tts_theme') || 'default';
+  applyTheme(saved);
+  const grid = document.getElementById('theme-grid');
+  if (!grid) return;
+  grid.innerHTML = '';
+  THEMES.forEach(t => {
+    const swatch = document.createElement('div');
+    swatch.className = `theme-swatch ${t.id === saved ? 'active' : ''}`;
+    swatch.style.background = `linear-gradient(135deg, ${t.colors[0]}, ${t.colors[1]}, ${t.colors[2]})`;
+    swatch.dataset.theme = t.id;
+    swatch.innerHTML = `<span class="theme-swatch-label">${t.name}</span>`;
+    swatch.addEventListener('click', () => {
+      applyTheme(t.id);
+      grid.querySelectorAll('.theme-swatch').forEach(s => s.classList.remove('active'));
+      swatch.classList.add('active');
+    });
+    grid.appendChild(swatch);
+  });
+}
+
+function applyTheme(themeId) {
+  document.documentElement.setAttribute('data-theme', themeId === 'default' ? '' : themeId);
+  localStorage.setItem('tts_theme', themeId);
+}
+
+let selectedStyle = 'neutral';
+
+async function initStyles() {
+  try {
+    const res = await fetch('/api/styles');
+    const data = await res.json();
+    const emotionalContainer = document.getElementById('emotional-styles');
+    const readingContainer = document.getElementById('reading-styles');
+    if (!emotionalContainer || !readingContainer) return;
+    emotionalContainer.innerHTML = '';
+    readingContainer.innerHTML = '';
+    data.styles.forEach(s => {
+      const pill = document.createElement('button');
+      pill.type = 'button';
+      pill.className = `style-pill ${s.category} ${s.id === selectedStyle ? 'active' : ''}`;
+      pill.textContent = s.name;
+      pill.dataset.style = s.id;
+      pill.addEventListener('click', () => {
+        selectedStyle = s.id;
+        document.querySelectorAll('.style-pill').forEach(p => p.classList.remove('active'));
+        pill.classList.add('active');
+      });
+      if (s.category === 'emotional') emotionalContainer.appendChild(pill);
+      else readingContainer.appendChild(pill);
+    });
+  } catch (e) {
+    console.warn('Could not load styles:', e);
+  }
+}
+
+const FORMATS = ['wav', 'mp3', 'ogg', 'flac'];
+
+function initFormatOptions() {
+  const container = document.getElementById('format-options');
+  if (!container) return;
+  container.innerHTML = '';
+  FORMATS.forEach(fmt => {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = `format-option ${fmt === State.settings.format ? 'active' : ''}`;
+    btn.textContent = fmt.toUpperCase();
+    btn.addEventListener('click', () => {
+      State.settings.format = fmt;
+      localStorage.setItem('tts_format', fmt);
+      container.querySelectorAll('.format-option').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      const formatTag = document.getElementById('format-tag');
+      if (formatTag) formatTag.textContent = fmt.toUpperCase();
+    });
+    container.appendChild(btn);
+  });
+}
+
+class WaveformVisualizer {
+  constructor(canvasOrContainer, spectrogramCanvas = null) {
+    this.ctx = null;
+    this.analyser = null;
+    this.audioCtx = null;
+    this.animId = null;
+    this.specAnimId = null;
+    this.canvas = canvasOrContainer;
+    this.spectrogramCanvas = spectrogramCanvas;
+  }
+
+  connectAudio(audioElement) {
+    if (!this.audioCtx) this.audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    const src = this.audioCtx.createMediaElementSource(audioElement);
+    this.analyser = this.audioCtx.createAnalyser();
+    this.analyser.fftSize = 256;
+    src.connect(this.analyser);
+    this.analyser.connect(this.audioCtx.destination);
+    this.draw();
+    if (this.spectrogramCanvas) {
+      this.drawSpectrogram();
+    }
+  }
+
+  draw() {
+    if (!this.analyser || !this.canvas) return;
+    const ctx = this.canvas.getContext('2d');
+    const bufferLength = this.analyser.frequencyBinCount;
+    const dataArray = new Uint8Array(bufferLength);
+    const W = this.canvas.width;
+    const H = this.canvas.height;
+    const barWidth = (W / bufferLength) * 2;
+
+    const render = () => {
+      this.animId = requestAnimationFrame(render);
+      this.analyser.getByteFrequencyData(dataArray);
+      ctx.clearRect(0, 0, W, H);
+      const primaryColor = getComputedStyle(document.documentElement).getPropertyValue('--primary').trim() || '#6366f1';
+      const accentColor = getComputedStyle(document.documentElement).getPropertyValue('--accent').trim() || '#d946ef';
+      let x = 0;
+      for (let i = 0; i < bufferLength; i++) {
+        const barHeight = (dataArray[i] / 255) * H;
+        const gradient = ctx.createLinearGradient(0, H, 0, H - barHeight);
+        gradient.addColorStop(0, primaryColor);
+        gradient.addColorStop(1, accentColor);
+        ctx.fillStyle = gradient;
+        ctx.fillRect(x, H - barHeight, barWidth - 1, barHeight);
+        x += barWidth;
+      }
+    };
+    render();
+  }
+
+  drawSpectrogram() {
+    if (!this.analyser || !this.spectrogramCanvas) return;
+    const ctx = this.spectrogramCanvas.getContext('2d');
+    const bufferLength = this.analyser.frequencyBinCount;
+    const dataArray = new Uint8Array(bufferLength);
+    const W = this.spectrogramCanvas.width;
+    const H = this.spectrogramCanvas.height;
+
+    // A separate canvas for shifting to prevent cumulative anti-aliasing issues
+    const tempCanvas = document.createElement('canvas');
+    tempCanvas.width = W;
+    tempCanvas.height = H;
+    const tempCtx = tempCanvas.getContext('2d', { willReadFrequently: true });
+    
+    // Primary/Accent for heat mapping
+    const pColor = getComputedStyle(document.documentElement).getPropertyValue('--primary').trim() || '#6366f1';
+    
+    // parse color string to rgb roughly
+    let rgb = [99, 102, 241];
+    if (pColor.startsWith('#')) {
+      const hex = pColor.replace('#', '');
+      if (hex.length === 6) {
+        rgb = [parseInt(hex.substring(0,2), 16), parseInt(hex.substring(2,4), 16), parseInt(hex.substring(4,6), 16)];
+      }
+    }
+
+    const render = () => {
+      this.specAnimId = requestAnimationFrame(render);
+      this.analyser.getByteFrequencyData(dataArray);
+
+      // Copy current frame to temp
+      tempCtx.clearRect(0, 0, W, H);
+      tempCtx.drawImage(this.spectrogramCanvas, 0, 0, W, H);
+
+      // Clear main and draw temp shifted left by 1
+      ctx.clearRect(0, 0, W, H);
+      ctx.drawImage(tempCanvas, -1, 0, W, H);
+
+      // Draw new column at W-1
+      const colW = 1;
+      const rowH = H / bufferLength;
+      
+      for (let i = 0; i < bufferLength; i++) {
+        const val = dataArray[i]; // 0-255
+        const intensity = val / 255;
+        // Map intensity to opacity of primary color
+        ctx.fillStyle = `rgba(${rgb[0]}, ${rgb[1]}, ${rgb[2]}, ${intensity})`;
+        // Invert Y axis
+        ctx.fillRect(W - colW, H - (i * rowH) - rowH, colW, rowH);
+      }
+    };
+    render();
+  }
+
+  stop() {
+    if (this.animId) cancelAnimationFrame(this.animId);
+    if (this.specAnimId) cancelAnimationFrame(this.specAnimId);
+  }
+}
+
+function getFavorites() {
+  try { return JSON.parse(localStorage.getItem('tts_favorites') || '[]'); }
+  catch { return []; }
+}
+function toggleFavorite(voiceId) {
+  const favs = getFavorites();
+  const idx = favs.indexOf(voiceId);
+  if (idx >= 0) favs.splice(idx, 1); else favs.push(voiceId);
+  localStorage.setItem('tts_favorites', JSON.stringify(favs));
+}
+function isFavorite(voiceId) { return getFavorites().includes(voiceId); }
+
+function formatDuration(seconds) {
+  if (!seconds || seconds <= 0) return '0s';
+  const m = Math.floor(seconds / 60);
+  const s = Math.round(seconds % 60);
+  return m > 0 ? `${m}m ${s}s` : `${s}s`;
+}
+
+function formatDurationLong(seconds) {
+  if (!seconds || seconds <= 0) return '0s';
+  const h = Math.floor(seconds / 3600);
+  const m = Math.floor((seconds % 3600) / 60);
+  const s = Math.round(seconds % 60);
+  if (h > 0) return `${h}h ${m}m`;
+  if (m > 0) return `${m}m ${s}s`;
+  return `${s}s`;
 }

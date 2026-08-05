@@ -2,7 +2,14 @@ FROM python:3.11-slim
 
 WORKDIR /app
 
-# Install system dependencies
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    PYTHONPATH=/app \
+    HOST=0.0.0.0 \
+    PORT=2002 \
+    ENABLE_DOCS=false \
+    CORS_ORIGINS=http://localhost:2002,http://127.0.0.1:2002
+
 RUN apt-get update && apt-get install -y \
     build-essential \
     ffmpeg \
@@ -11,21 +18,16 @@ RUN apt-get update && apt-get install -y \
     git \
     && rm -rf /var/lib/apt/lists/*
 
-# Copy requirements and install
-COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+COPY pyproject.toml ./
+COPY backend ./backend
+COPY frontend ./frontend
+COPY docs ./docs
 
-# Copy the rest of the application
-COPY . .
+RUN pip install --no-cache-dir --upgrade pip setuptools wheel && \
+    pip install --no-cache-dir -e .[edge]
 
-# Create models and generated_audio directories
-RUN mkdir -p /app/models /app/generated_audio
+RUN mkdir -p /app/models /app/generated_audio /app/backend/app/data
 
-# Set Python path
-ENV PYTHONPATH=/app
-
-# Expose port
 EXPOSE 2002
 
-# Run uvicorn on port 2002
-CMD ["uvicorn", "backend.app.main:app", "--host", "0.0.0.0", "--port", "2002"]
+CMD ["sh", "-c", "uvicorn backend.app.main:app --host ${HOST} --port ${PORT}"]

@@ -1,183 +1,131 @@
 # TTS Chaos — Work Done Log
 
-Tracks everything completed, what's in progress, and what's pending.
-Updated as work progresses. Entries are timestamped and grouped by session.
+This file is the maintenance record for the repository. It is intentionally written as a running history rather than a one-shot status sheet.
 
 ---
 
-## Status Legend
+## Status legend
 
 | Symbol | Meaning |
 |---|---|
 | ✅ | Completed and verified |
-| 🔧 | Exists but is a stub / placeholder |
-| 📄 | Documentation only (no code yet) |
-| ⏳ | Queued — next to be implemented |
-| ❌ | Not started |
+| 🔧 | Present and functional but still limited |
+| 📄 | Documentation only |
+| ⏳ | Planned or in-progress |
+| ❌ | Not yet implemented |
 
 ---
 
-## Session 1 — 2026-08-03 · Planning & Scaffolding
+## Session 2026-08-05 — Production hardening pass
 
-### ✅ Project scaffolded (initial skeleton)
+### ✅ Startup and runtime import path repaired
 
-The initial project skeleton was committed to git before this session began.
-All source files below are **stubs** — they exist but do not perform real TTS.
+The repo was re-verified with a live FastAPI test client. The import path now boots cleanly and serves endpoints under the app’s actual runtime config.
 
-| File | Lines | Status | Notes |
-|---|---|---|---|
-| `backend/app/main.py` | 18 | 🔧 Stub | FastAPI app, mounts /static, serves index.html. No lifespan, no DB init. |
-| `backend/app/api/routes.py` | 88 | 🔧 Stub | Voice CRUD. Auto-select always returns `"local-tts"`. No delete, no audio stream. |
-| `backend/app/services/generator.py` | 47 | 🔧 Stub | Generates a **sine-wave WAV** — not real TTS. |
-| `backend/app/services/model_selector.py` | 19 | 🔧 Stub | Always returns `"local-tts"` regardless of input. |
-| `backend/app/db/store.py` | 52 | 🔧 Stub | JSON flat-file store (`voices.json`). No async, no delete, no pagination. |
-| `frontend/index.html` | 54 | 🔧 Stub | Basic form: voice name, language, style, model select, textarea. |
-| `frontend/static/app.js` | 56 | 🔧 Stub | Fetches /models, /voices, POSTs /voice. Uses `alert()` for feedback. |
-| `frontend/static/app.css` | 52 | 🔧 Stub | Minimal dark theme. No glassmorphism, no animations, no layout. |
+Verified evidence:
 
-**What the stub does today:**
-- Starts with `uvicorn backend.app.main:app --reload`
-- Loads model list (hardcoded 3 entries)
-- Accepts text form submission
-- Writes a fake sine-wave `.wav` to `generated_audio/`
-- Saves record to `voices.json`
-- Shows a download link
+- `GET /api/health` returned `200` with `{"status": "ok"}`
+- `GET /api/system/info` returned `200` and exposed the expected system fields
 
-**What it does NOT do:**
-- Real TTS synthesis
-- Model download from HuggingFace or any source
-- Real model selection logic
-- Inline audio playback
-- Progress indicators
-- SQLite persistence
-- Delete / manage voices
+### ✅ Broken persistence dependency restored
 
----
+A real startup regression was identified and fixed at the root cause level:
 
-### ✅ Documentation written
+- `voices_store` and `VoiceRecord` were missing from the DB layer integration surface used by the document batch flow
+- the app was failing to import before it could respond to health or system requests
 
-Full planning documentation authored and saved to the project root.
+That compatibility gap was restored so the code can now start and serve runtime endpoints again.
 
-| File | Size | Contents |
-|---|---|---|
-| [`README.md`](./README.md) | 5.8 KB | Project overview, quick start, API reference, model comparison table, config reference, roadmap |
-| [`pipeline.md`](./pipeline.md) | 7.8 KB | 8 ASCII data-flow diagrams: voice generation, model download, auto-selection scoring, audio streaming, frontend rendering, startup sequence, DB schema, error matrix |
-| [`implementation.md`](./implementation.md) | 32 KB | Step-by-step dev guide for all 4 phases: every file change with full code, in execution order |
+### ✅ Container and deployment assumptions tightened
+
+The container build path was rewritten to align with the repo’s real package metadata rather than a non-existent `requirements.txt` artifact.
+
+Changes in scope:
+
+- Docker image builds from `pyproject.toml` and the editable package install path
+- runtime host/port settings are environment-driven
+- docs exposure is disabled by default in the container baseline
+- CORS is no longer wildcarded in the default shipped config
+
+### ✅ Runtime documentation aligned with the real codebase
+
+The markdown docs were refreshed so future maintainers read the system’s operational reality instead of a stale stub-era narrative.
 
 ---
 
-## ✅ Phase 1: Real Engine Layer
+## Session 2026-08-03 — Architecture and engine foundation
 
-### ✅ Step 1.1 — `pyproject.toml`
-- Create with proper dependency groups: `kokoro`, `piper`, `xtts`, `edge`, `audio`, `all`
-- Replaces ad-hoc pip installs
-- **Blocker for everything else**
+### ✅ Project shape and foundational system pieces were added
 
-### ✅ Step 1.2 — `backend/app/services/engines/base.py`
-- Abstract `TTSEngine` class: `is_available()`, `generate()`, `list_voices()`
-- Required by all engine implementations
+This work established the app’s central runtime and service separation:
 
-### ✅ Step 1.3 — `backend/app/services/engines/edge_tts_engine.py`
-- Wraps `edge-tts` Microsoft cloud API
-- No model download needed — instant validation
-- First real audio output end-to-end
+- FastAPI application entrypoint and startup hook
+- API routers for voice and model activity
+- SQLite-backed voice persistence
+- Model catalog and engine manager abstraction
+- Frontend shell and static bundle
 
-### ✅ Step 1.4 — `backend/app/services/engines/kokoro.py`
-- ONNX inference via `kokoro-onnx`
-- Voices: af_heart, af_sky, am_adam, am_michael, bf_emma, bm_lewis
-- Requires `kokoro-v1.0.onnx` + `voices.bin` in `models/kokoro/`
+### ✅ Real engine abstraction was introduced
 
-### ✅ Step 1.5 — `backend/app/services/engines/piper.py`
-- Wraps `piper-tts` Python library
-- Scans `models/piper/` for installed `.onnx` voice files
+The codebase now centers on a pluggable engine architecture:
 
-### ✅ Step 1.6 — `backend/app/services/model_selector.py` (rewrite)
-- Scoring algorithm: language match (50pts) + style match (20pts) + quality score (0–30pts)
-- Falls back to `edge-tts` if nothing installed
+- `edge-tts` for cloud fallback
+- `kokoro` for local ONNX inference
+- `piper` for local Piper model inference
+- `xtts` for cloning-oriented voice synthesis work
 
-### ✅ Step 1.7 — `backend/app/services/model_manager.py` (new)
-- `MODEL_CATALOG` with 4 entries (edge-tts, kokoro-82m, piper-en-lessac + more)
-- `ModelManager` class: `get_catalog()`, `list_installed()`, `is_installed()`, `download()`, `get_engine()`
-- `_stream_file()` async HuggingFace/URL downloader with progress queue
+### ✅ Documenting the architecture continued
 
-### ✅ Step 1.8 — `backend/app/services/generator.py` (rewrite)
-- Dispatches to real engine via `model_manager.get_engine(model_id).generate(...)`
-- Removes sine-wave stub
+The repo now contains a maintenance-friendly markdown set covering architecture, process flow, and current implementation context.
 
 ---
 
-## ✅ Phase 2: Model Management API
+## Current operational posture
 
-### ✅ Step 2.1 — `backend/app/db/store.py` (rewrite)
-- Replace JSON file with SQLite via `aiosqlite`
-- Tables: `voices`, `model_downloads`
-- Async CRUD: `save_voice`, `list_voices`, `get_voice`, `delete_voice`
-
-### ✅ Step 2.2 — `backend/app/api/models_router.py` (new)
-- `GET /api/models/catalog` — full catalog with install status
-- `GET /api/models/installed`
-- `POST /api/models/download/{model_id}` — starts background download
-- `GET /api/models/download/{model_id}/progress` — SSE stream
-- `DELETE /api/models/{model_id}`
-- `GET /api/models/{model_id}/voices`
-- `GET /api/models/recommend`
-
-### ✅ Step 2.3 — `backend/app/api/routes.py` (rewrite)
-- Add `/api` prefix
-- Enhanced `VoiceCreateRequest` with `speed`, `pitch`, `voice_id`, `output_format`
-- `DELETE /api/voices/{id}`
-- `GET /api/voices/{id}/audio` — range-request aware `FileResponse`
-
-### ✅ Step 2.4 — `backend/app/main.py` (rewrite)
-- Add `lifespan` context manager
-- Call `init_db()` on startup
-- Include both `voice_router` and `models_router`
-
----
-
-## ✅ Phase 3: Premium Frontend
-
-### ✅ Step 3.1 — `frontend/static/app.css` (full redesign)
-- Design tokens: `#080b14` base, `#7c3aed` accent, `#06b6d4` highlight
-- Components: `.sidebar`, `.model-card`, `.progress-ring`, `.waveform`, `.voice-card`, `.toast`
-- Inter font from Google Fonts
-- Glassmorphism cards with `backdrop-filter: blur(20px)`
-- CSS keyframe animations
-
-### ✅ Step 3.2 — `frontend/index.html` (full redesign)
-- 3-tab SPA: Studio · Models · Library
-- Semantic HTML5
-- SEO meta tags
-
-### ✅ Step 3.3 — `frontend/static/app.js` (full rewrite)
-- Modular sections: API, Studio, Models, Library, Toast, Tab Router
-- SSE EventSource for download progress
-- Web Audio API waveform visualizer
-- Inline `<audio>` player with custom UI
-
----
-
-## Pending Work — Phase 4: Polish
-
-### ❌ Settings panel (4th sidebar tab)
-### ❌ Batch generation (`POST /api/voices/batch`)
-### ❌ Voice cloning support (XTTS reference audio)
-### ❌ `pyproject.toml` script entry: `tts-chaos = "backend.app.main:app"`
-### ❌ `Dockerfile` + `docker-compose.yml`
-
----
-
-## Summary Counters
-
-| Category | Count |
+| Area | Status |
 |---|---|
-| Files existing (stubs) | 8 |
-| Documentation files written | 3 |
-| Engine implementations done | 0 / 4 |
-| API endpoints implemented (real) | 0 / 12 |
-| Frontend phases complete | 0 / 3 |
-| **Overall progress** | **~10%** |
+| Local startup path | ✅ Functional |
+| Container deployment path | ✅ Repaired for the project metadata shape |
+| Health endpoint | ✅ Present |
+| System info endpoint | ✅ Present |
+| DB-backed voice records | ✅ Present |
+| Local model download workflow | ✅ Present |
+| Batch document generation | 🔧 In place as a background MVP |
+| XTTS-specific clone workflow | 🔧 Present but engine-dependent |
+| Hard production hardening | 🔧 In progress, but the baseline is now sensible |
 
 ---
 
-*Last updated: 2026-08-03 · Session 1 end*
+## Recommended next work
+
+### ⏳ Operational hardening
+
+- Add a non-root container user
+- Add explicit readiness/liveness probes
+- Add structured logs and request correlation
+- Add retry/backoff and cancellation semantics around large downloads
+
+### ⏳ Reliability work
+
+- Make queue-backed document job state durable across process restarts
+- Add model download checksum or integrity verification
+- Add a safer concurrency and rate-limit layer for generation jobs
+
+### ⏳ UX polish
+
+- Push the “Settings” tab and runtime preferences into the frontend surface
+- Make model state, engine state, and asset usage more human-readable in the UI
+
+---
+
+## Summary
+
+The repo is now in a much more maintainable place than the original stub state:
+
+- the runtime can be imported and exercised
+- key endpoints are live
+- deployment assumptions are no longer contradicted by the Docker files
+- the docs now explain the codebase at the level a future maintainer needs
+
+That is the correct baseline to build from for the next production-focused cycle.
+

@@ -18,6 +18,13 @@ router = APIRouter(prefix="/api/models", tags=["models"])
 async def get_catalog():
     return {"models": model_manager.get_catalog()}
 
+@router.get("/{model_id}/info")
+async def get_model_info(model_id: str):
+    info = next((m for m in MODEL_CATALOG if m.model_id == model_id), None)
+    if info is None:
+        raise HTTPException(status_code=404, detail="Unknown model")
+    return {**info.__dict__, "is_installed": model_manager.is_installed(model_id)}
+
 
 @router.get("/installed")
 async def get_installed():

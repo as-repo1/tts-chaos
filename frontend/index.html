@@ -3,161 +3,167 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>TTS Chaos — AI Voice Studio</title>
+  <title>OmniVoice Studio</title>
+  <meta name="description" content="TTS Chaos — Professional AI voice studio with multiple engines, 400+ voices, and premium audio generation">
   <link rel="stylesheet" href="/static/app.css" />
+  <link rel="stylesheet" href="/static/themes.css" />
 </head>
 <body>
 
-  <!-- Sidebar Navigation -->
-  <aside class="sidebar">
-    <div class="sidebar-logo">
-      <div class="logo-icon">🎙️</div>
-      <h1>TTS Chaos</h1>
-    </div>
-
-    <div class="nav-section">
-      <div class="nav-label">Workspace</div>
-      
+  <!-- Floating Top Navigation -->
+  <nav class="top-nav">
+    <div class="nav-pill">
       <div class="nav-item active" data-tab="studio">
-        <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z"></path></svg>
+        <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z"></path></svg>
         Studio
-        <span class="shortcut">Ctrl+1</span>
       </div>
-
       <div class="nav-item" data-tab="models">
-        <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4m0 5c0 2.21-3.582 4-8 4s-8-1.79-8-4"></path></svg>
+        <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4m0 5c0 2.21-3.582 4-8 4s-8-1.79-8-4"></path></svg>
         Models
-        <span class="shortcut">Ctrl+2</span>
       </div>
-
       <div class="nav-item" data-tab="library">
-        <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"></path></svg>
+        <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"></path></svg>
         Library
         <span class="nav-badge" id="library-count-badge">0</span>
-        <span class="shortcut">Ctrl+3</span>
       </div>
-
       <div class="nav-item" data-tab="cloning">
-        <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z" /></svg>
-        Voice Cloning
-        <span class="shortcut">Ctrl+4</span>
+        <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z" /></svg>
+        Cloning
       </div>
-
-      <div class="nav-item" data-tab="dashboard">
-        <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path></svg>
-        Dashboard
-        <span class="shortcut">Ctrl+5</span>
+      <div class="nav-item" data-tab="director">
+        <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M7 4v16M17 4v16M3 8h4m10 0h4M3 12h18M3 16h4m10 0h4M4 20h16a1 1 0 001-1V5a1 1 0 00-1-1H4a1 1 0 00-1 1v14a1 1 0 001 1z"></path></svg>
+        <span>Director</span>
       </div>
-    </div>
-
-    <div class="sidebar-footer">
-      <div class="nav-item" id="open-settings">
-        <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path><path d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>
-        Settings
+      <div class="nav-item" data-tab="mixer">
+        <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-3c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zM9 10l12-3"></path></svg>
+        <span>Audio Mixer</span>
       </div>
-      <div class="nav-item" id="open-shortcuts">
-        <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
-        Shortcuts
-        <span class="shortcut">?</span>
+      
+      <div class="nav-divider"></div>
+      
+      <div class="nav-action" id="open-settings" title="Settings">
+        <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path><path d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>
+      </div>
+      <div class="nav-action" id="open-shortcuts" title="Shortcuts">
+        <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
       </div>
     </div>
-  </aside>
+  </nav>
 
   <!-- Main Content Area -->
   <main>
+    <h1 class="sr-only">TTS Chaos — AI Voice Studio</h1>
     
     <!-- STUDIO TAB -->
     <section id="tab-studio" class="tab-content active">
       <div class="page-header">
-        <div>
-          <h2>Voice Studio</h2>
-          <div class="subtitle">Synthesize ultra-realistic speech using ONNX models or Cloud fallback</div>
-        </div>
-        <div class="batch-toggle">
-          <span>Batch Mode</span>
-          <div class="toggle-switch" id="batch-switch"></div>
-        </div>
+        <h2>Voice Studio</h2>
+        <div class="subtitle">Synthesize ultra-realistic speech with precision and emotion</div>
       </div>
 
       <div class="studio-layout">
-        <div class="studio-main">
         
-          <!-- Batch Job Progress Container -->
-          <div id="batch-progress-container" class="glass-panel" style="display: none; margin-bottom: 24px; text-align: center; padding: 24px;">
-              <h3 style="margin-bottom: 8px;">Generating Document...</h3>
-              <div class="progress-bar" style="height: 12px; background: rgba(255,255,255,0.1); border-radius: 6px; overflow: hidden; margin-bottom: 12px;">
-                  <div id="batch-progress-fill" style="width: 0%; height: 100%; background: var(--primary-color); transition: width 0.3s ease;"></div>
+        <!-- Left Column: Input and Generation -->
+        <div class="workflow-main">
+          
+          <!-- Batch Progress -->
+          <div id="batch-progress-container" class="glass" style="display: none; margin-bottom: 32px; text-align: center; padding: 32px;">
+              <h3 style="margin-bottom: 12px; font-family: var(--font-display);">Processing Document</h3>
+              <div class="progress-bar">
+                  <div id="batch-progress-fill" class="progress-bar-fill" style="width: 0%;"></div>
               </div>
-              <p id="batch-progress-text" style="color: var(--text-secondary);">Chunk 0 of 0</p>
-              <div id="batch-action-container" style="display: none; margin-top: 16px; gap: 12px; justify-content: center;">
-                  <p style="color: #ff6b6b; margin-bottom: 8px;" id="batch-error-text">An error occurred.</p>
+              <p id="batch-progress-text" style="color: var(--text-secondary); margin-top: 8px;">Preparing chunks...</p>
+              <div id="batch-action-container" style="display: none; margin-top: 24px; gap: 16px; justify-content: center;">
+                  <p style="color: var(--danger); width: 100%;" id="batch-error-text">An error occurred.</p>
                   <button type="button" class="btn btn-primary" id="btn-batch-retry">Retry Chunk</button>
                   <button type="button" class="btn btn-secondary" id="btn-batch-skip">Skip Chunk</button>
-                  <button type="button" class="btn btn-secondary" id="btn-batch-cancel" style="background: rgba(255,107,107,0.2); color: #ff6b6b;">Cancel Job</button>
+                  <button type="button" class="btn btn-secondary" id="btn-batch-cancel" style="color: var(--danger); border-color: var(--danger);">Cancel</button>
               </div>
           </div>
-          
-          <div class="glass" style="padding: 24px;">
+
+          <div class="glass" style="padding: 32px;">
             <form id="voice-form">
               
-              <div class="form-group">
-                <div class="range-header" style="margin-bottom: 8px;">
-                  <label class="form-label" id="text-label" style="margin-bottom: 0;">Text Prompt <span class="required">*</span></label>
-                  <div style="display: flex; gap: 12px; align-items: center;">
-                    <input type="file" id="document-upload" accept=".txt,.pdf,.epub" style="display: none;">
-                    <button type="button" class="btn btn-secondary btn-sm" onclick="document.getElementById('document-upload').click()" style="padding: 4px 10px; font-size: 12px;">
-                        📄 Import Document
-                    </button>
-                    <span id="format-tag" class="badge badge-default">Format: WAV</span>
+              <div class="workflow-step">
+                <div class="workflow-title">
+                  <span class="workflow-number">1</span>
+                  <span>Input Script</span>
+                </div>
+                
+                <div class="form-group">
+                  <div class="range-header">
+                    <label class="form-label" id="text-label" style="margin-bottom: 0;">Text Prompt <span class="required">*</span></label>
+                    <div style="display: flex; gap: 12px; align-items: center;">
+                      <input type="file" id="document-upload" accept=".txt,.pdf,.epub" style="display: none;">
+                      <button type="button" class="btn btn-secondary btn-sm" onclick="document.getElementById('document-upload').click()" style="padding: 6px 12px; font-size: 12px;">
+                          📄 Import Document
+                      </button>
+                      <span id="format-tag" class="badge badge-default">WAV</span>
+                    </div>
+                  </div>
+                  <div class="form-group" style="margin-top: 12px; margin-bottom: 12px; display: flex; align-items: center; justify-content: space-between; background: rgba(0,0,0,0.2); padding: 8px 12px; border-radius: 4px; border: 1px solid var(--panel-border);">
+                    <label class="form-label" style="margin-bottom: 0;">Chunking Strategy (For Documents & Batch)</label>
+                    <select id="chunking-strategy" name="chunking_strategy" style="width: 250px; margin-bottom: 0;">
+                      <option value="standard">Standard (Character Limit)</option>
+                      <option value="semantic">Semantic / Topic-Based (AI)</option>
+                    </select>
+                  </div>
+                  <textarea id="text" name="text" placeholder="Enter text or markdown to convert into speech..." required></textarea>
+                  <div class="char-counter">
+                    <div class="batch-hint" id="batch-hint" style="display:none;">Batch mode active: Line breaks split audio.</div>
+                    <span id="char-count" class="count">0 / 5000 chars</span>
+                  </div>
+                  <div class="char-bar">
+                    <div id="char-bar-fill" class="char-bar-fill" style="width: 0%;"></div>
                   </div>
                 </div>
-                <textarea id="text" name="text" rows="5" placeholder="Enter text to convert into speech..." required></textarea>
-                <div class="char-counter">
-                  <div class="batch-hint" id="batch-hint" style="display:none;">Line breaks will generate separate audio clips (up to 50 clips).</div>
-                  <span id="char-count" class="count">0 / 5000 chars</span>
-                </div>
-                <div class="char-bar">
-                  <div id="char-bar-fill" class="char-bar-fill" style="width: 0%;"></div>
-                </div>
-              </div>
 
-              <div class="grid-2">
-                <div class="form-group">
-                  <label class="form-label">Language</label>
-                  <select id="language" name="language">
-                    <option value="en">English (US/UK/IN/AU)</option>
-                    <option value="fr">French (France)</option>
-                    <option value="de">German (Germany)</option>
-                    <option value="es">Spanish (Spain/Mexico)</option>
-                    <option value="ja">Japanese</option>
-                    <option value="zh">Chinese (Mandarin)</option>
-                    <option value="ko">Korean</option>
-                    <option value="pt">Portuguese (Brazil)</option>
-                    <option value="it">Italian</option>
-                    <option value="ru">Russian</option>
-                    <option value="hi">Hindi</option>
-                    <option value="tr">Turkish</option>
-                  </select>
-                </div>
-
-                <div class="form-group">
-                  <label class="form-label">Voice Save Name</label>
-                  <input type="text" id="voice-name" name="voice_name" value="Voice Clip" required>
+                <div class="grid-2">
+                  <div class="form-group">
+                    <label class="form-label">Language</label>
+                    <select id="language" name="language">
+                      <option value="en">English (US/UK/IN/AU)</option>
+                      <option value="fr">French</option>
+                      <option value="de">German</option>
+                      <option value="es">Spanish</option>
+                      <option value="ja">Japanese</option>
+                      <option value="zh">Chinese (Mandarin)</option>
+                      <option value="ko">Korean</option>
+                      <option value="pt">Portuguese (Brazil)</option>
+                      <option value="it">Italian</option>
+                      <option value="ru">Russian</option>
+                      <option value="hi">Hindi</option>
+                      <option value="bn">Bengali</option>
+                    </select>
+                  </div>
+                  <div class="form-group">
+                    <label class="form-label">Output Name</label>
+                    <input type="text" id="voice-name" name="voice_name" value="Studio Generation" required>
+                  </div>
                 </div>
               </div>
 
-              <div style="display: flex; align-items: center; justify-content: space-between; margin-top: 24px;">
-                <button type="submit" class="btn btn-primary" id="generate-btn">
-                  <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"></path><path d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
-                  <span>Synthesize Audio</span>
-                  <span class="shortcut" style="background:rgba(255,255,255,0.2); color:white;">Ctrl+Enter</span>
-                </button>
+              <div class="workflow-step" style="margin-bottom: 0;">
+                <div class="workflow-title">
+                  <span class="workflow-number">2</span>
+                  <span>Synthesize</span>
+                </div>
+                
+                <div style="display: flex; align-items: center; justify-content: space-between; background: rgba(0,0,0,0.2); padding: 20px; border-radius: var(--radius-md); border: 1px solid var(--panel-border);">
+                  <button type="submit" class="btn btn-primary" id="generate-btn" style="font-size: 16px; padding: 14px 32px;">
+                    <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"></path><path d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                    <span>Generate Audio</span>
+                  </button>
 
-                <div id="studio-waveform" class="waveform" style="display: none; width: 120px;">
-                  <div class="waveform-bar"></div><div class="waveform-bar"></div>
-                  <div class="waveform-bar"></div><div class="waveform-bar"></div>
-                  <div class="waveform-bar"></div><div class="waveform-bar"></div>
-                  <div class="waveform-bar"></div><div class="waveform-bar"></div>
+                  <div id="studio-waveform-container" style="display: flex; flex-direction: column; gap: 8px;">
+                    <div id="studio-waveform" class="waveform" style="display: none;">
+                      <div class="waveform-bar"></div><div class="waveform-bar"></div>
+                      <div class="waveform-bar"></div><div class="waveform-bar"></div>
+                      <div class="waveform-bar"></div><div class="waveform-bar"></div>
+                      <div class="waveform-bar"></div><div class="waveform-bar"></div>
+                    </div>
+                    <canvas class="spectrogram-canvas" id="studio-spectrogram" width="400" height="60" style="display: none;"></canvas>
+                  </div>
                 </div>
               </div>
 
@@ -165,13 +171,19 @@
           </div>
         </div>
 
-        <!-- Studio Control Sidebar -->
-        <div class="studio-sidebar">
-          <div class="glass-elevated sidebar-card">
-            <h4>Model & Engine</h4>
+        <!-- Right Column: Settings Panel -->
+        <div class="properties-panel">
+          
+          <div class="batch-toggle">
+            <span>Batch Processing</span>
+            <div class="toggle-switch" id="batch-switch"></div>
+          </div>
+
+          <div class="glass panel-section">
+            <h4 style="margin-bottom: 20px; font-size: 16px; color: white;">Voice Selection</h4>
             
             <div class="form-group">
-              <label class="form-label">Voice Mode</label>
+              <label class="form-label">Voice Category</label>
               <select id="voice-mode">
                 <option value="all">All Modes</option>
                 <option value="audiobook">Audiobooks</option>
@@ -183,23 +195,35 @@
             </div>
             
             <div class="form-group">
-              <label class="form-label">Target Model</label>
+              <label class="form-label">AI Engine</label>
               <select id="model-id" name="model_id">
                 <option value="">Auto Select (Recommended)</option>
               </select>
-              <div id="auto-hint" style="font-size: 11px; color: var(--highlight); margin-top: 6px;"></div>
+              <div id="auto-hint" style="font-size: 12px; color: var(--accent); margin-top: 8px;"></div>
             </div>
 
-            <div class="form-group" style="margin-bottom: 0;">
-              <label class="form-label">Speaker / Voice Persona</label>
+            <div class="form-group" style="margin-bottom: 12px;">
+              <label class="form-label">Speaker / Persona</label>
               <select id="voice-id" name="voice_id">
                 <option value="auto">Default Persona</option>
               </select>
             </div>
+            <div class="form-group" style="margin-bottom: 12px; display: flex; align-items: center; justify-content: space-between;">
+              <label class="form-label" style="margin-bottom: 0;">Smart Emotion (Auto)</label>
+              <div class="toggle-switch" id="smart-style"></div>
+            </div>
+            <div class="form-group" style="margin-bottom: 12px;">
+              <label class="form-label">Emotional</label>
+              <div class="style-pills" id="emotional-styles"></div>
+            </div>
+            <div class="form-group" style="margin-bottom: 0;">
+              <label class="form-label">Reading Mode</label>
+              <div class="style-pills" id="reading-styles"></div>
+            </div>
           </div>
 
-          <div class="glass-elevated sidebar-card">
-            <h4>Audio Fine-Tuning</h4>
+          <div class="glass panel-section">
+            <h4 style="margin-bottom: 20px; font-size: 16px; color: white;">Fine-Tuning</h4>
             <div class="form-group">
               <div class="range-header">
                 <label class="form-label">Speaking Speed</label>
@@ -216,6 +240,23 @@
               <input type="range" id="pitch" name="pitch" value="0" step="1" min="-10" max="10">
             </div>
           </div>
+
+          <div class="glass panel-section">
+            <h4 style="margin-bottom: 20px; font-size: 16px; color: white;">Audio Effects (DAW)</h4>
+            <div class="form-group" style="margin-bottom: 12px; display: flex; align-items: center; justify-content: space-between;">
+              <label class="form-label" style="margin-bottom: 0;">Reverb</label>
+              <div class="toggle-switch" id="effect-reverb"></div>
+            </div>
+            <div class="form-group" style="margin-bottom: 12px; display: flex; align-items: center; justify-content: space-between;">
+              <label class="form-label" style="margin-bottom: 0;">Compressor</label>
+              <div class="toggle-switch" id="effect-compressor"></div>
+            </div>
+            <div class="form-group" style="margin-bottom: 0; display: flex; align-items: center; justify-content: space-between;">
+              <label class="form-label" style="margin-bottom: 0;">EQ</label>
+              <div class="toggle-switch" id="effect-eq"></div>
+            </div>
+          </div>
+
         </div>
       </div>
     </section>
@@ -223,30 +264,60 @@
     <!-- MODELS TAB -->
     <section id="tab-models" class="tab-content">
       <div class="page-header">
-        <div>
-          <h2>Model Manager</h2>
-          <div class="subtitle">Browse, download, and manage TTS models directly from HuggingFace repositories</div>
-        </div>
+        <h2>Engine Architectures</h2>
+        <div class="subtitle">Download and provision localized ONNX models for offline synthesis</div>
       </div>
       <div id="models-grid" class="models-grid"></div>
     </section>
 
-    <!-- LIBRARY TAB -->
+    <!-- LIBRARY TAB (Now includes Dashboard Stats) -->
     <section id="tab-library" class="tab-content">
-      <div class="page-header">
+      <div class="page-header" style="display: flex; justify-content: space-between; align-items: flex-start;">
         <div>
           <h2>Voice Library</h2>
-          <div class="subtitle">Browse, play, and export all generated audio assets</div>
+          <div class="subtitle">Your generated audio and usage statistics</div>
+        </div>
+        <div style="display: flex; gap: 8px;">
+          <input type="text" id="rss-url" placeholder="RSS Feed URL" class="form-input" style="padding: 8px; border-radius: var(--radius-md); border: 1px solid var(--panel-border); background: rgba(0,0,0,0.2); color: white;">
+          <div style="display: flex; align-items: center; gap: 8px; margin-left: 8px; margin-right: 8px;">
+            <label style="font-size: 13px; color: var(--text-secondary); cursor: pointer;"><input type="checkbox" id="rss-summarize" style="margin-right: 4px;"> AI Summarize</label>
+          </div>
+          <button class="btn btn-secondary" id="rss-generate-btn">RSS Podcast</button>
+        </div>
+      </div>
+
+      <!-- Dashboard Stats embedded in Library -->
+      <div class="dashboard-stats">
+        <div class="stat-card">
+          <div class="stat-icon" style="color: #a855f7;">🎙️</div>
+          <div class="stat-info">
+            <div id="stat-total-voices" class="stat-value">0</div>
+            <div class="stat-label">Voices Generated</div>
+          </div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icon" style="color: #06b6d4;">⏱️</div>
+          <div class="stat-info">
+            <div id="stat-total-duration" class="stat-value">0s</div>
+            <div class="stat-label">Total Duration</div>
+          </div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icon" style="color: #10b981;">💾</div>
+          <div class="stat-info">
+            <div id="stat-disk-usage" class="stat-value">0 MB</div>
+            <div class="stat-label">Audio Storage</div>
+          </div>
         </div>
       </div>
 
       <div class="search-bar">
         <div class="search-input-wrap">
-          <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
+          <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
           <input type="text" id="library-search" placeholder="Search voices by prompt text or name...">
         </div>
         <select id="filter-model" class="filter-select">
-          <option value="">All Models</option>
+          <option value="">All Engines</option>
         </select>
         <select id="filter-lang" class="filter-select">
           <option value="">All Languages</option>
@@ -254,36 +325,36 @@
           <option value="fr">French</option>
           <option value="de">German</option>
           <option value="es">Spanish</option>
+          <option value="bn">Bengali</option>
         </select>
       </div>
 
       <div id="library-list" class="voices-list"></div>
+      <div id="library-pagination" class="pagination"></div>
     </section>
 
     <!-- CLONING TAB -->
     <section id="tab-cloning" class="tab-content">
       <div class="page-header">
-        <div>
-          <h2>Voice Cloning Studio</h2>
-          <div class="subtitle">Upload a voice sample to mimic its tone, accent, and style in zero-shot.</div>
-        </div>
+        <h2>Voice Cloning</h2>
+        <div class="subtitle">Extract style and accent from an audio sample for zero-shot cloning</div>
       </div>
 
-      <div class="glass" style="max-width: 800px; padding: 32px; margin: 0 auto;">
+      <div class="glass" style="max-width: 800px; padding: 48px; margin: 0 auto;">
         <form id="clone-form">
           <div class="form-group">
-            <label class="form-label">Reference Audio Sample <span class="required">*</span></label>
+            <label class="form-label">Reference Audio <span class="required">*</span></label>
             <div class="upload-zone" id="upload-zone">
               <input type="file" id="clone-audio" name="audio_file" accept=".wav,.mp3" required>
               <div class="upload-icon">🎵</div>
               <div class="upload-text" id="upload-text">Click or drag & drop an audio file here</div>
-              <div class="upload-subtext">Supported formats: WAV, MP3 (Max 10 seconds, clear speech, no background noise)</div>
+              <div class="upload-subtext">Max 10 seconds, clear speech, no background noise</div>
             </div>
           </div>
 
           <div class="form-group">
-            <label class="form-label">Text to Synthesize <span class="required">*</span></label>
-            <textarea id="clone-text" name="text" rows="4" placeholder="Type the text you want the cloned voice to say..." required></textarea>
+            <label class="form-label">Synthesis Text <span class="required">*</span></label>
+            <textarea id="clone-text" name="text" rows="4" placeholder="Type what you want the cloned voice to say..." required></textarea>
           </div>
           
           <div class="grid-2">
@@ -296,73 +367,130 @@
                 <option value="es">Spanish</option>
                 <option value="it">Italian</option>
                 <option value="pt">Portuguese</option>
-                <option value="pl">Polish</option>
-                <option value="tr">Turkish</option>
-                <option value="ru">Russian</option>
+                <option value="bn">Bengali</option>
               </select>
             </div>
             
             <div class="form-group" style="margin-bottom:0;">
-              <label class="form-label">Output Voice Name</label>
-              <input type="text" id="clone-name" name="voice_name" value="Cloned Voice" required>
+              <label class="form-label">Voice Name</label>
+              <input type="text" id="clone-name" name="voice_name" value="Cloned Output" required>
             </div>
           </div>
           
-          <div style="margin-top: 32px; display: flex; align-items: center; justify-content: space-between;">
-            <button type="submit" class="btn btn-primary" id="clone-btn">
-              <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z" /></svg>
-              <span>Clone Voice & Generate</span>
+          <div style="margin-top: 40px; display: flex; align-items: center; justify-content: space-between;">
+            <button type="submit" class="btn btn-primary" id="clone-btn" style="font-size: 16px; padding: 14px 32px;">
+              <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z" /></svg>
+              <span>Clone & Synthesize</span>
             </button>
-            <div id="clone-waveform" class="waveform" style="display: none; width: 120px;">
-              <div class="waveform-bar"></div><div class="waveform-bar"></div>
-              <div class="waveform-bar"></div><div class="waveform-bar"></div>
-              <div class="waveform-bar"></div><div class="waveform-bar"></div>
-              <div class="waveform-bar"></div><div class="waveform-bar"></div>
+            <div id="clone-waveform-container" style="display: flex; flex-direction: column; gap: 8px;">
+              <div id="clone-waveform" class="waveform" style="display: none;">
+                <div class="waveform-bar"></div><div class="waveform-bar"></div>
+                <div class="waveform-bar"></div><div class="waveform-bar"></div>
+                <div class="waveform-bar"></div><div class="waveform-bar"></div>
+                <div class="waveform-bar"></div><div class="waveform-bar"></div>
+              </div>
+              <canvas class="spectrogram-canvas" id="clone-spectrogram" width="400" height="60" style="display: none;"></canvas>
             </div>
           </div>
         </form>
       </div>
     </section>
 
-    <!-- DASHBOARD TAB -->
-    <section id="tab-dashboard" class="tab-content">
+    <!-- DIRECTOR TAB -->
+    <section id="tab-director" class="tab-content">
       <div class="page-header">
+        <h2>Director</h2>
+        <div class="subtitle">Multi-Voice Screenplay Generation</div>
+      </div>
+
+      <div class="studio-layout">
+        <!-- Left Sidebar: Characters -->
+        <div class="properties-panel">
+          <div class="glass panel-section">
+            <h4 style="margin-bottom: 20px; font-size: 16px; color: white;">Characters</h4>
+            <div id="character-list" style="margin-bottom: 16px; display: flex; flex-direction: column; gap: 12px;"></div>
+            <button class="btn btn-secondary btn-sm" id="add-character-btn" style="width: 100%;">+ Add Character</button>
+          </div>
+        </div>
+
+        <!-- Main Panel: Script -->
+        <div class="workflow-main">
+          <div class="glass" style="padding: 32px; display: flex; flex-direction: column; height: 100%; min-height: 400px;">
+            <div class="form-group" style="flex: 1; display: flex; flex-direction: column; margin-bottom: 0;">
+              <label class="form-label">Screenplay Script</label>
+              <textarea id="director-script" placeholder="Write your screenplay here...\nExample:\nNARRATOR: Welcome to the story.\nALICE: Hello there!\nBOB: Hi Alice!" style="flex: 1; min-height: 300px; resize: vertical; margin-bottom: 24px; font-family: monospace;"></textarea>
+            </div>
+            
+            <div style="display: flex; justify-content: space-between; align-items: center; background: rgba(0,0,0,0.2); padding: 20px; border-radius: var(--radius-md); border: 1px solid var(--panel-border);">
+              <button class="btn btn-primary" id="generate-scene-btn" style="font-size: 16px; padding: 14px 32px;">
+                <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"></path><path d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                <span>Generate Scene</span>
+              </button>
+              <div id="director-waveform-container" style="display: flex; flex-direction: column; gap: 8px;">
+                <div id="director-waveform" class="waveform" style="display: none;">
+                  <div class="waveform-bar"></div><div class="waveform-bar"></div>
+                  <div class="waveform-bar"></div><div class="waveform-bar"></div>
+                  <div class="waveform-bar"></div><div class="waveform-bar"></div>
+                  <div class="waveform-bar"></div><div class="waveform-bar"></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- MIXER TAB -->
+    <section id="tab-mixer" class="tab-content">
+      <div class="page-header" style="display: flex; justify-content: space-between; align-items: flex-end;">
         <div>
-          <h2>System Dashboard</h2>
-          <div class="subtitle">Real-time statistics, disk usage, and model performance metrics</div>
+          <h2>Audio Mixer</h2>
+          <div class="subtitle">Multi-track timeline for arranging and mixing voice clips</div>
         </div>
+        <button class="btn btn-primary" id="export-mix-btn">
+            <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
+            <span>Export Mix</span>
+        </button>
       </div>
 
-      <div class="stats-grid">
-          <div class="stat-icon purple">🎙️</div>
-          <div id="stat-total-voices" class="stat-value">0</div>
-          <div class="stat-label">Total Voices Generated</div>
+      <div class="studio-layout">
+        <!-- Left Sidebar: Library Snippets -->
+        <div class="properties-panel" style="overflow-y: auto;">
+          <div class="glass panel-section">
+            <h4 style="margin-bottom: 20px; font-size: 16px; color: white;">Clips Library</h4>
+            <div id="mixer-library-list" style="display: flex; flex-direction: column; gap: 12px; max-height: 500px; overflow-y: auto; padding-right: 8px;">
+                <div style="color: var(--text-secondary); text-align: center; font-size: 13px; padding: 20px 0;">No clips in library.</div>
+            </div>
+          </div>
         </div>
-        <div class="glass stat-card">
-          <div class="stat-icon cyan">⏱️</div>
-          <div id="stat-total-duration" class="stat-value">0s</div>
-          <div class="stat-label">Total Speech Duration</div>
-        </div>
-        <div class="glass stat-card">
-          <div class="stat-icon green">💾</div>
-          <div id="stat-disk-usage" class="stat-value">0 MB</div>
-          <div class="stat-label">Audio Storage Usage</div>
-        </div>
-        <div class="glass stat-card">
-          <div class="stat-icon yellow">🤖</div>
-          <div id="stat-models-count" class="stat-value">0</div>
-          <div class="stat-label">Installed Models</div>
-        </div>
-      </div>
 
-      <div class="grid-2">
-        <div class="glass" style="padding: 24px;">
-          <h3 style="font-size: 16px; margin-bottom: 16px;">Disk & Storage Breakdown</h3>
-          <div id="storage-breakdown" style="display: flex; flex-direction: column; gap: 12px;"></div>
-        </div>
-        <div class="glass" style="padding: 24px;">
-          <h3 style="font-size: 16px; margin-bottom: 16px;">Model Usage Frequency</h3>
-          <div id="models-usage-breakdown" style="display: flex; flex-direction: column; gap: 12px;"></div>
+        <!-- Main Panel: Timeline -->
+        <div class="workflow-main">
+          <div class="glass" style="padding: 24px; display: flex; flex-direction: column; height: 100%; min-height: 400px; overflow-x: auto;">
+            
+            <div class="mixer-timeline-container" id="mixer-timeline-container">
+              <!-- Ruler -->
+              <div class="mixer-ruler" id="mixer-ruler"></div>
+              
+              <!-- Tracks -->
+              <div class="mixer-track" data-track="1" id="track-1">
+                  <div class="track-header">Track 1</div>
+                  <div class="track-content" id="track-content-1"></div>
+              </div>
+              <div class="mixer-track" data-track="2" id="track-2">
+                  <div class="track-header">Track 2</div>
+                  <div class="track-content" id="track-content-2"></div>
+              </div>
+              <div class="mixer-track" data-track="3" id="track-3">
+                  <div class="track-header">Track 3</div>
+                  <div class="track-content" id="track-content-3"></div>
+              </div>
+              
+              <!-- Playhead -->
+              <div class="mixer-playhead" id="mixer-playhead"></div>
+            </div>
+
+          </div>
         </div>
       </div>
     </section>
@@ -370,24 +498,26 @@
   </main>
 
   <!-- Settings Drawer -->
-  <div id="settings-overlay" class="settings-overlay"></div>
-  <div id="settings-drawer" class="settings-drawer">
+  <div id="settings-overlay" class="settings-overlay" role="dialog" aria-label="Settings Overlay"></div>
+  <div id="settings-drawer" class="settings-drawer" role="dialog" aria-label="Settings Drawer">
     <div class="settings-header">
       <h3>Studio Settings</h3>
       <button class="btn-icon" id="close-settings">✕</button>
     </div>
 
     <div class="setting-row">
-      <label>Default Output Format</label>
-      <select id="setting-format">
-        <option value="wav">WAV (Uncompressed PCM 16-bit)</option>
-        <option value="mp3">MP3 (MPEG Audio)</option>
-      </select>
-      <div class="setting-desc">WAV offers full lossless quality; MP3 requires ffmpeg installed.</div>
+      <label>Audio Format</label>
+      <div style="display: flex; gap: 8px; flex-wrap: wrap;" id="format-options"></div>
+      <div class="setting-desc">WAV = lossless, MP3 = compressed, OGG = open codec, FLAC = lossless compressed.</div>
     </div>
 
     <div class="setting-row">
-      <label>Auto-Play After Generation</label>
+      <label>Theme</label>
+      <div class="theme-grid" id="theme-grid"></div>
+    </div>
+
+    <div class="setting-row">
+      <label>Auto-Play</label>
       <select id="setting-autoplay">
         <option value="true">Enabled</option>
         <option value="false">Disabled</option>
@@ -401,34 +531,42 @@
   </div>
 
   <!-- Keyboard Shortcuts Modal -->
-  <div id="shortcuts-overlay" class="shortcuts-overlay">
-    <div class="shortcuts-panel">
+  <div id="shortcuts-overlay" class="shortcuts-overlay" role="dialog" aria-label="Shortcuts Overlay">
+    <div class="shortcuts-panel" role="dialog" aria-label="Shortcuts">
       <h3>Keyboard Shortcuts</h3>
       <div class="shortcut-row">
         <span class="action">Synthesize Speech</span>
         <span class="kbd">Ctrl + Enter</span>
       </div>
       <div class="shortcut-row">
-        <span class="action">Switch to Studio</span>
+        <span class="action">Go to Studio</span>
         <span class="kbd">Ctrl + 1</span>
       </div>
       <div class="shortcut-row">
-        <span class="action">Switch to Models</span>
+        <span class="action">Go to Models</span>
         <span class="kbd">Ctrl + 2</span>
       </div>
       <div class="shortcut-row">
-        <span class="action">Switch to Library</span>
+        <span class="action">Go to Library</span>
         <span class="kbd">Ctrl + 3</span>
       </div>
       <div class="shortcut-row">
-        <span class="action">Switch to Dashboard</span>
+        <span class="action">Go to Cloning</span>
         <span class="kbd">Ctrl + 4</span>
       </div>
       <div class="shortcut-row">
-        <span class="action">Toggle Help Overlay</span>
+        <span class="action">Open Shortcuts</span>
         <span class="kbd">?</span>
       </div>
-      <div style="margin-top: 24px; text-align: right;">
+      <div class="shortcut-row">
+        <span class="action">Close Modals</span>
+        <span class="kbd">Esc</span>
+      </div>
+      <div class="shortcut-row">
+        <span class="action">Play/Pause Audio</span>
+        <span class="kbd">Space</span>
+      </div>
+      <div style="margin-top: 32px; text-align: right;">
         <button class="btn btn-secondary" id="close-shortcuts">Close</button>
       </div>
     </div>
@@ -438,5 +576,6 @@
   <div id="toast-container" class="toast-container"></div>
 
   <script type="module" src="/static/app.js"></script>
+  <script src="/static/mixer.js"></script>
 </body>
 </html>

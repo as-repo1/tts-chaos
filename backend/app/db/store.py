@@ -2,9 +2,11 @@ from __future__ import annotations
 
 import aiosqlite
 from pathlib import Path
-from datetime import datetime
+from datetime import datetime, timezone
 from uuid import uuid4
 from typing import Any
+
+from pydantic import BaseModel, Field
 
 DB_PATH = Path(__file__).resolve().parents[2] / "data" / "voices.db"
 DB_PATH.parent.mkdir(parents=True, exist_ok=True)
@@ -29,6 +31,45 @@ CREATE TABLE IF NOT EXISTS voices (
 """
 
 
+class VoiceRecord(BaseModel):
+    id: str = Field(default_factory=lambda: str(uuid4()))
+    voice_name: str
+    language: str = "en"
+    style: str = "neutral"
+    text: str
+    model_id: str
+    voice_id: str | None = None
+    speed: float = 1.0
+    pitch: float = 0.0
+    file_path: str
+    file_size: int | None = None
+    duration_sec: float | None = None
+    output_format: str = "wav"
+    created_at: str = Field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
+
+
+class VoiceStore:
+    async def save(self, record: VoiceRecord) -> dict[str, Any]:
+        payload = record.model_dump()
+        async with aiosqlite.connect(DB_PATH) as db:
+            await db.execute(
+                "INSERT INTO voices VALUES (:id,:voice_name,:language,:style,:text,:model_id,"
+                ":voice_id,:speed,:pitch,:file_path,:file_size,:duration_sec,:output_format,:created_at)",
+                payload,
+            )
+            await db.commit()
+        return payload
+
+    async def delete(self, voice_id: str) -> bool:
+        async with aiosqlite.connect(DB_PATH) as db:
+            cur = await db.execute("DELETE FROM voices WHERE id=?", (voice_id,))
+            await db.commit()
+            return cur.rowcount > 0
+
+
+voices_store = VoiceStore()
+
+
 async def init_db():
     async with aiosqlite.connect(DB_PATH) as db:
         await db.execute(CREATE_VOICES)
@@ -38,7 +79,7 @@ async def init_db():
 async def save_voice(**kwargs) -> dict[str, Any]:
     record = {
         "id": str(uuid4()),
-        "created_at": datetime.utcnow().isoformat(),
+        "created_at": datetime.now(timezone.utc).isoformat(),
         **kwargs,
     }
     async with aiosqlite.connect(DB_PATH) as db:

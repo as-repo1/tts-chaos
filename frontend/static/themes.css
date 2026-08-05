@@ -1,0 +1,136 @@
+@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&display=swap');
+
+/* ── Theme: Gruvbox Dark ──────────────────────────────────────── */
+[data-theme="gruvbox"] {
+  --bg-color: #1d2021;
+  --panel-bg: rgba(40, 40, 40, 0.65);
+  --panel-border: rgba(235, 219, 178, 0.08);
+  --text-main: #ebdbb2;
+  --text-secondary: #a89984;
+  --text-tertiary: #7c6f64;
+  --primary: #d79921;
+  --primary-hover: #b57614;
+  --accent: #b8bb26;
+  --danger: #fb4934;
+  --success: #b8bb26;
+  --highlight: #fe8019;
+}
+
+/* ── Theme: Tokyo Night ───────────────────────────────────────── */
+[data-theme="tokyo-night"] {
+  --bg-color: #1a1b26;
+  --panel-bg: rgba(30, 31, 48, 0.65);
+  --panel-border: rgba(122, 162, 247, 0.08);
+  --text-main: #c0caf5;
+  --text-secondary: #9aa5ce;
+  --text-tertiary: #565f89;
+  --primary: #7aa2f7;
+  --primary-hover: #5d7de0;
+  --accent: #bb9af7;
+  --danger: #f7768e;
+  --success: #9ece6a;
+  --highlight: #7dcfff;
+}
+
+/* ── Theme: Nord ──────────────────────────────────────────────── */
+[data-theme="nord"] {
+  --bg-color: #2e3440;
+  --panel-bg: rgba(46, 52, 64, 0.7);
+  --panel-border: rgba(136, 192, 208, 0.1);
+  --text-main: #eceff4;
+  --text-secondary: #d8dee9;
+  --text-tertiary: #81a1c1;
+  --primary: #88c0d0;
+  --primary-hover: #6ba8b8;
+  --accent: #b48ead;
+  --danger: #bf616a;
+  --success: #a3be8c;
+  --highlight: #ebcb8b;
+}
+
+/* ── Theme: Dark Nord ─────────────────────────────────────────── */
+[data-theme="dark-nord"] {
+  --bg-color: #1c1f26;
+  --panel-bg: rgba(28, 31, 38, 0.7);
+  --panel-border: rgba(129, 161, 193, 0.08);
+  --text-main: #d8dee9;
+  --text-secondary: #81a1c1;
+  --text-tertiary: #4c566a;
+  --primary: #81a1c1;
+  --primary-hover: #6889a8;
+  --accent: #b48ead;
+  --danger: #bf616a;
+  --success: #a3be8c;
+  --highlight: #5e81ac;
+}
+
+/* ── Theme: Dracula ───────────────────────────────────────────── */
+[data-theme="dracula"] {
+  --bg-color: #282a36;
+  --panel-bg: rgba(40, 42, 54, 0.7);
+  --panel-border: rgba(189, 147, 249, 0.1);
+  --text-main: #f8f8f2;
+  --text-secondary: #bd93f9;
+  --text-tertiary: #6272a4;
+  --primary: #bd93f9;
+  --primary-hover: #a574e0;
+  --accent: #ff79c6;
+  --danger: #ff5555;
+  --success: #50fa7b;
+  --highlight: #f1fa8c;
+}
+
+/* ── Theme: Retro Amber ───────────────────────────────────────── */
+[data-theme="retro"] {
+  --bg-color: #0a0a0a;
+  --panel-bg: rgba(15, 12, 5, 0.7);
+  --panel-border: rgba(255, 176, 0, 0.1);
+  --text-main: #ffb000;
+  --text-secondary: #cc8800;
+  --text-tertiary: #664400;
+  --primary: #ffb000;
+  --primary-hover: #e69e00;
+  --accent: #ff6600;
+  --danger: #ff3300;
+  --success: #33ff00;
+  --highlight: #ffdd00;
+}
+/* Retro also gets a scanline effect and monospace font override */
+[data-theme="retro"] body {
+  font-family: 'JetBrains Mono', 'Fira Code', 'Courier New', monospace;
+  text-shadow: 0 0 5px rgba(255, 176, 0, 0.3);
+}
+[data-theme="retro"] h1, [data-theme="retro"] h2, [data-theme="retro"] h3,
+[data-theme="retro"] h4, [data-theme="retro"] h5 {
+  font-family: 'JetBrains Mono', 'Fira Code', monospace;
+}
+[data-theme="retro"] body::after {
+  content: '';
+  position: fixed;
+  inset: 0;
+  background: repeating-linear-gradient(
+    0deg,
+    transparent,
+    transparent 2px,
+    rgba(0, 0, 0, 0.15) 2px,
+    rgba(0, 0, 0, 0.15) 4px
+  );
+  pointer-events: none;
+  z-index: 9999;
+}
+
+/* ── Theme: Catppuccin Mocha ──────────────────────────────────── */
+[data-theme="catppuccin"] {
+  --bg-color: #1e1e2e;
+  --panel-bg: rgba(30, 30, 46, 0.7);
+  --panel-border: rgba(137, 180, 250, 0.08);
+  --text-main: #cdd6f4;
+  --text-secondary: #bac2de;
+  --text-tertiary: #6c7086;
+  --primary: #89b4fa;
+  --primary-hover: #6c9ef0;
+  --accent: #f5c2e7;
+  --danger: #f38ba8;
+  --success: #a6e3a1;
+  --highlight: #fab387;
+}

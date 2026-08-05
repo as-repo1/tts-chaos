@@ -9,6 +9,10 @@ services:
     volumes:
       - ./models:/app/models
       - ./generated_audio:/app/generated_audio
+      - ./backend/app/data:/app/backend/app/data
     restart: unless-stopped
     environment:
-      - PORT=2002
+      HOST: 0.0.0.0
+      PORT: 2002
+      ENABLE_DOCS: "false"
+      CORS_ORIGINS: "http://localhost:2002,http://127.0.0.1:2002"

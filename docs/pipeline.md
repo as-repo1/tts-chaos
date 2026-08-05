@@ -1,292 +1,188 @@
-# TTS Chaos — Pipeline
+# TTS Chaos — Runtime and Deployment Pipeline
 
-This document describes the full data flow and processing pipeline for every major operation.
+This document captures the current request flow, startup behavior, storage model, and deployment posture of the repository as it exists today.
 
 ---
 
-## 1. Voice Generation Pipeline
+## 1. Main request lifecycle
 
-```
-User (Browser)
-    │
-    ▼
-[POST /api/voice] ── VoiceCreateRequest
-    │
-    ├─► Validate payload (Pydantic)
-    │
-    ├─► Auto-select model (if model_id is null)
-    │       │
-    │       ├─ Query ModelManager.list_installed()
-    │       ├─ Score each model (language match · style · quality)
-    │       └─ Return best model_id
-    │
-    ├─► ModelManager.get_engine(model_id)
-    │       │
-    │       └─ Returns live TTSEngine instance
-    │
-    ├─► TTSEngine.generate(text, voice_id, speed, pitch)
-    │       │
-    │       ├─ [kokoro]    ONNX inference → raw PCM bytes
-    │       ├─ [piper]     subprocess piper binary → WAV bytes
-    │       ├─ [xtts]      PyTorch inference → WAV bytes
-    │       └─ [edge-tts]  HTTPS to Microsoft → MP3/WAV bytes
-    │
-    ├─► generator.write_audio(bytes, format)
-    │       │
-    │       ├─ Write WAV to generated_audio/
-    │       └─ Optionally encode to MP3 via ffmpeg subprocess
-    │
-    ├─► VoiceStore.save(record)
-    │       │
-    │       └─ INSERT INTO voices (SQLite, aiosqlite)
-    │
-    └─► Return VoiceRecord JSON to browser
+```text
+Browser
+  │
+  ▼
+GET / or /static/*
+  │
+  └─ FastAPI serves the SPA shell and static assets.
+
+POST /api/voice
+  │
+  ├─ Validate payload with Pydantic
+  ├─ Auto-select a model when `model_id` is omitted
+  ├─ Resolve an engine through `ModelManager`
+  ├─ Generate audio bytes
+  ├─ Write the output file under `generated_audio/`
+  └─ Store a row in the SQLite `voices` table
+
+GET /api/voices/{voice_id}/audio
+  │
+  ├─ Read the voice record
+  ├─ Resolve the file path on disk
+  └─ Return `FileResponse` with the appropriate audio media type
 ```
 
 ---
 
-## 2. Voice Cloning Pipeline (XTTS)
+## 2. Startup and lifespan sequence
 
+```text
+uvicorn backend.app.main:app --host ${HOST} --port ${PORT}
+  │
+  ▼
+FastAPI lifespan hook
+  │
+  ├─ Initialize the SQLite database (`voices.db`)
+  ├─ Register the voice API router
+  ├─ Register the model API router
+  ├─ Mount the frontend static assets
+  └─ Expose a health endpoint and a system-info endpoint
 ```
-User (Browser)
-    │
-    ▼
-[POST /api/voice/clone] ── (Multipart FormData: audio_file, text, voice_name)
-    │
-    ├─► Save uploaded audio to tempfile (.wav)
-    │
-    ├─► Call generator.generate_cloned_audio_asset(text, ref_audio_path, xtts-v2)
-    │       │
-    │       ├─ ModelManager.get_engine("xtts-v2")
-    │       ├─ TTSEngine.generate_cloned()
-    │       │       │
-    │       │       └─ Coqui XTTS inference with gpt_cond_len=3, temperature=0.75
-    │       │
-    │       └─ Write output WAV to generated_audio/
-    │
-    ├─► Delete tempfile
-    │
-    ├─► VoiceStore.save(record) 
-    │       │
-    │       └─ INSERT INTO voices (model_id='xtts-v2', voice_id='cloned')
-    │
-    └─► Return VoiceRecord JSON to browser
-```
+
+Important runtime defaults now come from environment variables:
+
+- `HOST`
+- `PORT`
+- `ENABLE_DOCS`
+- `CORS_ORIGINS`
+
+This is the production-facing shape the repo now depends on.
 
 ---
 
-## 2. Model Download Pipeline
+## 3. Model selection path
 
+```text
+POST /api/voice
+  │
+  └─ `auto_select_model(text, language, style, model_manager)`
+        │
+        ├─ Ask `ModelManager` for installed engine candidates
+        ├─ Apply a score based on language/style/quality
+        └─ Return the highest-scoring installed model
 ```
-User clicks "Download" on a model card
-    │
-    ▼
-[POST /api/models/download/{model_id}]
-    │
-    ├─► Validate model_id exists in MODEL_CATALOG
-    ├─► Check not already installed / downloading
-    ├─► Create download record in model_downloads table (status=queued)
-    └─► Spawn asyncio background task
-            │
-            ▼
-    BackgroundTask: model_manager.download(model_id)
-            │
-            ├─► Resolve download source
-            │       ├─ HuggingFace Hub: huggingface_hub.hf_hub_download()
-            │       └─ Direct URL: httpx streaming GET
-            │
-            ├─► Stream file in chunks (8192 bytes)
-            │       │
-            │       ├─ Write chunk to models/{engine}/{model_id}/
-            │       ├─ Update progress = bytes_received / total_bytes
-            │       └─ Publish progress to asyncio.Queue
-            │
-            ├─► Verify checksum (SHA256 if available)
-            │
-            ├─► Initialize engine (load model into memory)
-            │       ├─ [kokoro]  ort.InferenceSession(model.onnx)
-            │       ├─ [piper]   check binary + model.onnx present
-            │       ├─ [xtts]    TTS(model_name).to(device)
-            │       └─ [edge]    no-op (cloud, always available)
-            │
-            └─► UPDATE model_downloads SET status='complete'
 
-
-Parallel: Browser polls progress
-    │
-    ▼
-[GET /api/models/download/{model_id}/progress]  ← SSE endpoint
-    │
-    └─► EventSourceResponse — reads from asyncio.Queue
-            │
-            ├─ event: download_started  { model_id, total_bytes }
-            ├─ event: download_progress { model_id, progress: 0.0–1.0, mb_received }
-            ├─ event: download_complete { model_id }
-            └─ event: download_error    { model_id, error }
-```
+If there is no installed model available, the default fallback is `edge-tts`.
 
 ---
 
-## 3. Model Auto-Selection Pipeline
+## 4. Download pipeline
 
+```text
+POST /api/models/download/{model_id}
+  │
+  ├─ Validate that the catalog entry exists
+  ├─ Reject duplicate work if the model is already installed
+  └─ Start background download work with `asyncio.create_task(...)`
+
+Background task
+  │
+  ├─ Resolve the URL(s) for the requested model payload
+  ├─ Stream file chunks with `httpx.AsyncClient`
+  ├─ Persist them to `models/<engine>/<model_id>/`
+  ├─ Push progress events into an in-memory queue
+  └─ Mark the model available once the stream is complete
 ```
-VoiceCreateRequest { model_id: null, language: "fr", style: "dramatic" }
-    │
-    ▼
-model_selector.auto_select(text, language, style)
-    │
-    ├─► Build candidate list from ModelManager.list_installed()
-    │
-    ├─► Score each candidate:
-    │       score = 0
-    │       if language in model.languages:     score += 50
-    │       if style in model.supported_styles: score += 20
-    │       score += model.quality_score         (0–30)
-    │       if model.is_gpu and cuda_available:  score += 10
-    │
-    ├─► Sort by score descending
-    │
-    ├─► Pick top candidate
-    │
-    ├─► If no installed model matches → fallback to edge-tts
-    │
-    └─► Return model_id string
-```
+
+Browser progress is consumed by the SSE endpoint at:
+
+- `/api/models/download/{model_id}/progress`
 
 ---
 
-## 4. Audio Streaming Pipeline
+## 5. Document and batch generation flow
 
+```text
+POST /api/voice/document
+  │
+  ├─ Read uploaded document content
+  ├─ Parse it into text via `document_parser.py`
+  ├─ Queue a background document job
+  └─ Return `job_id`
+
+Background batch job
+  │
+  ├─ Chunk text into manageable units
+  ├─ Create one WAV asset per chunk
+  ├─ Merge chunks with ffmpeg
+  ├─ Save the merged asset to disk
+  └─ Record the final voice file in the `voices` table
 ```
-User clicks ▶ Play in the Library
-    │
-    ▼
-Browser: new Audio(src="/api/voices/{id}/audio")
-    │
-    ▼
-[GET /api/voices/{id}/audio]
-    │
-    ├─► Lookup voice record in SQLite
-    ├─► Resolve file_path on disk
-    ├─► Read Range header (if present)
-    └─► FileResponse with:
-            Content-Type: audio/wav (or audio/mpeg)
-            Accept-Ranges: bytes
-            Content-Range: bytes start-end/total  (if range)
-```
+
+The document workflow is present in the API surface, but it remains a queue-based MVP and should continue to be treated as an operationally sensitive background task.
 
 ---
 
-## 5. Frontend Rendering Pipeline
+## 6. Storage model
 
-```
-Browser loads /
-    │
-    ▼
-index.html parsed → app.js (ES modules) loaded
-    │
-    ├─► api.getModels()      → populate Models tab
-    ├─► api.getVoices()      → populate Library tab
-    └─► api.getRecommendation() → show auto-select hint in Studio
-            │
-            ▼
-    User navigates tabs (no page reload — CSS class switching)
-            │
-    Studio tab:
-    ├─► User types text → debounced recommendation refresh
-    ├─► User selects model → voice dropdown updates via api.getModelVoices()
-    └─► Submit → showWaveformAnimation() → POST /api/voice → appendVoiceCard()
-
-    Models tab:
-    ├─► Cards render with badges: [Cloud] [Installed] [Downloading X%]
-    └─► Download click → EventSource(progressURL) → update progress ring
-
-    Library tab:
-    ├─► Voice cards with inline <audio> + custom waveform via Web Audio API
-    └─► Delete click → DELETE /api/voices/{id} → remove card
-
-    Cloning tab:
-    ├─► Drag-and-drop audio file upload
-    └─► Submit → Show multi-bar waveform → POST /api/voice/clone (FormData) → Redirect to Library
-```
-
----
-
-## 6. Startup Pipeline
-
-```
-uvicorn starts
-    │
-    ▼
-FastAPI lifespan (async context manager)
-    │
-    ├─► aiosqlite: create/migrate voices.db
-    │       CREATE TABLE IF NOT EXISTS voices (...)
-    │
-    ├─► ModelManager.scan_installed()
-    │       for engine_dir in models/:
-    │           check if model files present → mark as installed
-    │
-    ├─► Register routers
-    │       /api/voice, /api/voices → routes.py
-    │       /api/models/*           → models_router.py
-    │
-    ├─► Mount /static → frontend/static/
-    └─► Mount / → frontend/index.html (SPA catch-all)
-```
-
----
-
-## 7. Docker Deployment Pipeline
-
-```
-Host OS
-    │
-    ▼
-[docker-compose up -d]
-    │
-    ├─► Builds image from Dockerfile (python:3.11-slim)
-    │       ├─ Install ffmpeg, build-essential
-    │       └─ uv pip install requirements
-    │
-    ├─► Mounts Volumes: ./models, ./generated_audio
-    │
-    └─► Exposes Container Port 2002 -> Host Port 2002
-```
-
----
-
-## 7. Database Schema
+The persistent voice metadata currently uses SQLite via `aiosqlite`.
 
 ```sql
--- Generated voice records
-CREATE TABLE voices (
-    id              TEXT PRIMARY KEY,
-    voice_name      TEXT NOT NULL,
-    language        TEXT NOT NULL DEFAULT 'en',
-    style           TEXT NOT NULL DEFAULT 'neutral',
-    text            TEXT NOT NULL,
-    model_id        TEXT NOT NULL,
-    voice_id        TEXT,
-    speed           REAL NOT NULL DEFAULT 1.0,
-    pitch           REAL NOT NULL DEFAULT 0.0,
-    file_path       TEXT NOT NULL,
-    file_size       INTEGER,
-    duration_sec    REAL,
-    output_format   TEXT NOT NULL DEFAULT 'wav',
-    created_at      TEXT NOT NULL
+CREATE TABLE IF NOT EXISTS voices (
+    id TEXT PRIMARY KEY,
+    voice_name TEXT NOT NULL,
+    language TEXT NOT NULL DEFAULT 'en',
+    style TEXT NOT NULL DEFAULT 'neutral',
+    text TEXT NOT NULL,
+    model_id TEXT NOT NULL,
+    voice_id TEXT,
+    speed REAL NOT NULL DEFAULT 1.0,
+    pitch REAL NOT NULL DEFAULT 0.0,
+    file_path TEXT NOT NULL,
+    file_size INTEGER,
+    duration_sec REAL,
+    output_format TEXT NOT NULL DEFAULT 'wav',
+    created_at TEXT NOT NULL
 );
 ```
 
+The DB file is kept under:
+
+- `backend/app/data/voices.db`
+
 ---
 
-## 8. Error Handling Matrix
+## 7. Docker deployment posture
 
-| Scenario | HTTP Code | Client Action |
-|---|---|---|
-| Model not installed, no fallback | 503 | Show "No model available" toast |
-| Model download fails (network) | 200 (SSE error event) | Show retry button |
-| Text too long (>5000 chars) | 422 | Highlight textarea, show limit |
-| Audio file missing on disk | 404 | Show "regenerate" prompt |
-| Engine crash during generation | 500 | Show error toast + log |
-| Concurrent generation limit hit | 429 | Queue indicator in UI |
+```text
+docker compose up --build -d
+  │
+  ├─ Build the image from the repo root
+  ├─ Expose port `2002`
+  ├─ Mount model and audio volumes
+  └─ Start the app through the environment-aware uvicorn command
+```
+
+This is the preferred self-hosted deployment shape.
+
+---
+
+## 8. Failure modes to keep in mind
+
+- Missing optional engine dependencies can make a model unavailable even if it is in the catalog.
+- Local downloaded model assets are not automatically validated beyond availability checks.
+- Batch/document jobs run as background tasks and depend on stable FFmpeg and file-system permissions.
+- Production defaults are now safer, but the repo still expects a controlled network and storage environment for large downloads.
+
+---
+
+## 9. Current maintainer guidance
+
+If someone is returning to the codebase later, the most important places to read first are:
+
+1. [backend/app/main.py](../backend/app/main.py) for runtime startup and middleware
+2. [backend/app/api/routes.py](../backend/app/api/routes.py) for the voice and document API surface
+3. [backend/app/api/models_router.py](../backend/app/api/models_router.py) for catalog and download behavior
+4. [backend/app/db/store.py](../backend/app/db/store.py) for persistence shape
+5. [backend/app/services/model_manager.py](../backend/app/services/model_manager.py) for model discovery and lifecycle
+
+That combination will give a maintainer the fastest “how the system boots and serves requests” mental model.
+
