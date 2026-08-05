@@ -15,6 +15,25 @@ TTS Chaos is a self-hosted, browser-first text-to-speech studio built with FastA
 - Persists voice records in SQLite and streams saved audio files back to the browser
 - Ships with a Docker-first deployment shape for self-hosting
 
+### System Architecture
+
+```mermaid
+graph TD
+    Client[Browser UI SPA] -->|REST API| FastAPI[FastAPI Backend]
+    FastAPI --> DB[(SQLite Voices)]
+    FastAPI --> Services[Service Layer]
+    
+    Services --> Engine[Model Manager]
+    Services --> Mix[Audio Mixer]
+    Services --> AI[Semantic & RSS AI]
+    
+    Engine --> Edge[Edge-TTS Cloud]
+    Engine --> Kokoro[Kokoro ONNX]
+    Engine --> Piper[Piper CPU]
+    
+    Mix --> FFmpeg[FFmpeg Processing]
+```
+
 ---
 
 ## 🗂️ Current project structure

@@ -193,6 +193,25 @@ async def create_cloned_voice(
         shutil.copyfileobj(audio_file.file, tmp)
         tmp_path = tmp.name
         
+    if not model_manager.is_installed("xtts-v2"):
+        # Auto-download the cloning model if not installed
+        try:
+            await model_manager.download("xtts-v2")
+            
+            # Wait for download to finish
+            queue = model_manager._progress.get("xtts-v2")
+            if queue:
+                import asyncio
+                while True:
+                    msg = await queue.get()
+                    if msg.get("event") in ("download_complete", "download_error"):
+                        if msg.get("event") == "download_error":
+                            raise RuntimeError(f"Failed to download XTTS-v2: {msg.get('error')}")
+                        break
+        except Exception as e:
+            Path(tmp_path).unlink(missing_ok=True)
+            raise HTTPException(status_code=500, detail=f"XTTS-v2 model is required for cloning but failed to download: {e}")
+
     try:
         asset = generate_cloned_audio_asset(
             text=text,

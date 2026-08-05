@@ -106,9 +106,11 @@ const API = {
 const State = {
   catalog: [],
   isBatch: false,
+  isStreaming: false,
   settings: {
     format: localStorage.getItem('tts_format') || 'wav',
     autoplay: localStorage.getItem('tts_autoplay') !== 'false',
+    playbackSpeed: parseFloat(localStorage.getItem('tts_playback_speed')) || 1.0,
   }
 };
 
@@ -197,9 +199,11 @@ const speedInput = document.getElementById('speed');
 const pitchInput = document.getElementById('pitch');
 const speedVal = document.getElementById('speed-val');
 const pitchVal = document.getElementById('pitch-val');
+const batchSwitch = document.getElementById('batch-switch');
+const streamSwitch = document.getElementById('stream-switch');
+const batchHint = document.getElementById('batch-hint');
 const charCount = document.getElementById('char-count');
 const charBarFill = document.getElementById('char-bar-fill');
-const batchSwitch = document.getElementById('batch-switch');
 
 async function initStudio() {
   State.catalog = await API.getCatalog();
@@ -287,6 +291,23 @@ batchSwitch.addEventListener('click', () => {
   batchSwitch.classList.toggle('active', State.isBatch);
   document.getElementById('batch-hint').style.display = State.isBatch ? 'block' : 'none';
   document.getElementById('text-label').childNodes[0].textContent = State.isBatch ? 'Batch Lines ' : 'Text Prompt ';
+  
+  if (State.isBatch && State.isStreaming) {
+    State.isStreaming = false;
+    streamSwitch.classList.remove('active');
+  }
+});
+
+streamSwitch.addEventListener('click', () => {
+  State.isStreaming = !State.isStreaming;
+  streamSwitch.classList.toggle('active', State.isStreaming);
+  
+  if (State.isStreaming && State.isBatch) {
+    State.isBatch = false;
+    batchSwitch.classList.remove('active');
+    document.getElementById('batch-hint').style.display = 'none';
+    document.getElementById('text-label').childNodes[0].textContent = 'Text Prompt ';
+  }
 });
 
 // Form Submission
@@ -318,7 +339,14 @@ form.addEventListener('submit', async (e) => {
   };
 
   try {
-    if (State.isBatch) {
+    if (State.isStreaming) {
+      // Connect to WebSocket and stream audio
+      generateBtn.disabled = true;
+      Toast.show('Starting stream...');
+      await playAudioStream({ ...basePayload, text });
+      Toast.show('Stream finished!');
+      return; // We don't switch to library tab for streams
+    } else if (State.isBatch) {
       const lines = text.split('\n').map(l => l.trim()).filter(l => l.length > 0);
       if (lines.length === 0) throw new Error('No valid text lines found');
       const res = await API.createBatch({ ...basePayload, texts: lines });
@@ -342,6 +370,62 @@ form.addEventListener('submit', async (e) => {
     studioWaveform.classList.remove('active');
   }
 });
+
+// --- Stream Playback Logic ---
+async function playAudioStream(payload) {
+  return new Promise((resolve, reject) => {
+    const wsUrl = (window.location.protocol === 'https:' ? 'wss:' : 'ws:') + '//' + window.location.host + '/api/stream';
+    const ws = new WebSocket(wsUrl);
+    
+    // Web Audio API context
+    const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    let nextStartTime = audioCtx.currentTime;
+    let chunksReceived = 0;
+    
+    ws.onopen = () => {
+      ws.send(JSON.stringify(payload));
+    };
+    
+    ws.onmessage = async (event) => {
+      if (typeof event.data === 'string') {
+        const msg = JSON.parse(event.data);
+        if (msg.type === 'error') {
+          ws.close();
+          reject(new Error(msg.message));
+        } else if (msg.type === 'done') {
+          ws.close();
+          // Wait for all audio to finish playing if needed, but we'll just resolve here
+          setTimeout(resolve, 1000); 
+        }
+      } else {
+        // We received binary WAV data
+        chunksReceived++;
+        try {
+          const arrayBuffer = await event.data.arrayBuffer();
+          const audioBuffer = await audioCtx.decodeAudioData(arrayBuffer);
+          
+          const source = audioCtx.createBufferSource();
+          source.buffer = audioBuffer;
+          source.playbackRate.value = State.settings.playbackSpeed;
+          source.connect(audioCtx.destination);
+          
+          if (nextStartTime < audioCtx.currentTime) {
+             nextStartTime = audioCtx.currentTime;
+          }
+          source.start(nextStartTime);
+          nextStartTime += audioBuffer.duration / State.settings.playbackSpeed;
+        } catch (e) {
+          console.error("Error decoding audio chunk:", e);
+        }
+      }
+    };
+    
+    ws.onerror = (e) => {
+      ws.close();
+      reject(new Error("WebSocket error"));
+    };
+  });
+}
 
 // ─── MODELS LOGIC ──────────────────────────────────────────────────────────
 
@@ -563,6 +647,7 @@ async function renderLibrary() {
 
       currentAudio = new Audio(url);
       currentAudio.crossOrigin = "anonymous";
+      currentAudio.playbackRate = State.settings.playbackSpeed || 1.0;
       
       if (wfAnim) wfAnim.style.display = 'none';
       wfCanvas.style.display = 'block';
@@ -720,6 +805,8 @@ const settingsOverlay = document.getElementById('settings-overlay');
 const settingsDrawer = document.getElementById('settings-drawer');
 const settingFormat = document.getElementById('setting-format');
 const settingAutoplay = document.getElementById('setting-autoplay');
+const settingPlaybackSpeed = document.getElementById('setting-playback-speed');
+const settingPlaybackSpeedVal = document.getElementById('setting-playback-speed-val');
 
 document.getElementById('open-settings').addEventListener('click', () => {
   settingsOverlay.classList.add('open');
@@ -740,6 +827,22 @@ settingAutoplay.addEventListener('change', (e) => {
   State.settings.autoplay = e.target.value === 'true';
   localStorage.setItem('tts_autoplay', e.target.value);
 });
+
+if (settingPlaybackSpeed) {
+  settingPlaybackSpeed.value = State.settings.playbackSpeed;
+  settingPlaybackSpeedVal.textContent = State.settings.playbackSpeed.toFixed(1) + 'x';
+  
+  settingPlaybackSpeed.addEventListener('input', (e) => {
+    const val = parseFloat(e.target.value);
+    State.settings.playbackSpeed = val;
+    localStorage.setItem('tts_playback_speed', val.toString());
+    settingPlaybackSpeedVal.textContent = val.toFixed(1) + 'x';
+    
+    if (currentAudio) {
+      currentAudio.playbackRate = val;
+    }
+  });
+}
 
 // Shortcuts overlay
 document.getElementById('open-shortcuts').addEventListener('click', () => {
@@ -1267,3 +1370,175 @@ function formatDurationLong(seconds) {
   if (m > 0) return `${m}m ${s}s`;
   return `${s}s`;
 }
+
+// --- UI INTERACTIONS & EASTER EGGS ---
+
+document.addEventListener('DOMContentLoaded', () => {
+    // 1. Initialize Lucide Icons
+    if (typeof lucide !== 'undefined') {
+        lucide.createIcons();
+    }
+
+    // 2. Interactive Glow on Glass panels
+    const glassPanels = document.querySelectorAll('.glass');
+    glassPanels.forEach(panel => {
+        panel.addEventListener('pointermove', (e) => {
+            const rect = panel.getBoundingClientRect();
+            const x = ((e.clientX - rect.left) / rect.width) * 100;
+            const y = ((e.clientY - rect.top) / rect.height) * 100;
+            panel.style.setProperty('--mouse-x', `${x}%`);
+            panel.style.setProperty('--mouse-y', `${y}%`);
+        });
+    });
+
+    // 3. Konami Code Easter Egg
+    const konamiCode = ['ArrowUp', 'ArrowUp', 'ArrowDown', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'ArrowLeft', 'ArrowRight', 'b', 'a'];
+    let konamiIndex = 0;
+    document.addEventListener('keydown', (e) => {
+        if (e.key === konamiCode[konamiIndex]) {
+            konamiIndex++;
+            if (konamiIndex === konamiCode.length) {
+                document.body.classList.toggle('easter-egg-active');
+                konamiIndex = 0;
+            }
+        } else {
+            konamiIndex = 0;
+        }
+    });
+
+    // 4. Clickable Logo Easter Egg (5 clicks for confetti)
+    const logo = document.querySelector('.page-header h2');
+    let logoClicks = 0;
+    if (logo) {
+        logo.addEventListener('click', () => {
+            logoClicks++;
+            if (logoClicks >= 5) {
+                spawnConfetti();
+                logoClicks = 0;
+            }
+        });
+    }
+
+    function spawnConfetti() {
+        for (let i = 0; i < 50; i++) {
+            const conf = document.createElement('div');
+            conf.classList.add('confetti');
+            conf.style.left = Math.random() * 100 + 'vw';
+            conf.style.backgroundColor = `hsl(${Math.random() * 360}, 100%, 60%)`;
+            conf.style.animationDuration = (Math.random() * 2 + 1) + 's';
+            document.body.appendChild(conf);
+            setTimeout(() => conf.remove(), 3000);
+        }
+    }
+
+    // 5. Waveform reacts to typing
+    const textInput = document.getElementById('text');
+    if (textInput && window.visualizer) {
+        textInput.addEventListener('input', () => {
+            if(window.visualizer.draw) {
+                const dataArray = new Uint8Array(window.visualizer.bufferLength || 128);
+                for(let i=0; i < dataArray.length; i++) {
+                    dataArray[i] = 128 + (Math.random() * 50 - 25);
+                }
+                window.visualizer.draw(dataArray);
+            }
+        });
+    }
+
+    // 6. Fetch Recent Voices
+    fetchRecentVoices();
+});
+
+async function fetchRecentVoices() {
+    const grid = document.getElementById('recent-voices-grid');
+    if (!grid) return;
+    
+    try {
+        const res = await fetch('/api/voices?limit=6');
+        const data = await res.json();
+        
+        if (!data.voices || data.voices.length === 0) {
+            grid.innerHTML = '<div style="color: var(--text-tertiary); padding: 16px;">No recent generations found.</div>';
+            return;
+        }
+        
+        grid.innerHTML = '';
+        data.voices.forEach(voice => {
+            const card = document.createElement('div');
+            card.className = 'glass recent-card';
+            card.innerHTML = `
+                <div class="recent-header">
+                    <span class="badge badge-primary">${voice.model_id}</span>
+                    <span style="font-size: 12px; color: var(--text-tertiary);">${new Date(voice.created_at).toLocaleDateString()}</span>
+                </div>
+                <div class="recent-prompt">"${voice.prompt_text || 'No prompt'}"</div>
+                <div class="recent-actions">
+                    <button class="btn btn-secondary btn-sm" onclick="playRecentAudio(this, '${voice.file_path}')" title="Play">
+                        <i data-lucide="play" style="width: 14px; height: 14px;"></i>
+                    </button>
+                    <a class="btn btn-secondary btn-sm" href="/api/download?path=${encodeURIComponent(voice.file_path)}" title="Download">
+                        <i data-lucide="download" style="width: 14px; height: 14px;"></i>
+                    </a>
+                </div>
+            `;
+            grid.appendChild(card);
+        });
+        
+        if (typeof lucide !== 'undefined') lucide.createIcons();
+        
+        // Re-attach pointermove to newly created glass cards
+        const newGlassPanels = grid.querySelectorAll('.glass');
+        newGlassPanels.forEach(panel => {
+            panel.addEventListener('pointermove', (e) => {
+                const rect = panel.getBoundingClientRect();
+                const x = ((e.clientX - rect.left) / rect.width) * 100;
+                const y = ((e.clientY - rect.top) / rect.height) * 100;
+                panel.style.setProperty('--mouse-x', `${x}%`);
+                panel.style.setProperty('--mouse-y', `${y}%`);
+            });
+        });
+        
+    } catch (err) {
+        console.error('Failed to fetch recent voices', err);
+    }
+}
+
+window.playRecentAudio = function(btn, path) {
+    const icon = btn.querySelector('i');
+    if (window.recentAudio) {
+        window.recentAudio.pause();
+        if (window.recentPlayingBtn && window.recentPlayingBtn !== btn) {
+            const oldIcon = window.recentPlayingBtn.querySelector('i');
+            if (oldIcon && typeof lucide !== 'undefined') {
+                oldIcon.setAttribute('data-lucide', 'play');
+                lucide.createIcons();
+            }
+        }
+    }
+    
+    if (window.recentPlayingBtn === btn && window.recentAudio && !window.recentAudio.paused) {
+        // Just pause it
+        if (icon && typeof lucide !== 'undefined') {
+            icon.setAttribute('data-lucide', 'play');
+            lucide.createIcons();
+        }
+        return;
+    }
+    
+    window.recentAudio = new Audio(`/api/audio?path=${encodeURIComponent(path)}`);
+    window.recentAudio.play();
+    window.recentPlayingBtn = btn;
+    
+    if (icon && typeof lucide !== 'undefined') {
+        icon.setAttribute('data-lucide', 'pause');
+        lucide.createIcons();
+    }
+    
+    window.recentAudio.onended = () => {
+        if (icon && typeof lucide !== 'undefined') {
+            icon.setAttribute('data-lucide', 'play');
+            lucide.createIcons();
+        }
+        window.recentPlayingBtn = null;
+    };
+};

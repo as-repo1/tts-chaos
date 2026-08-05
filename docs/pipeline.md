@@ -6,37 +6,25 @@ This document captures the current request flow, startup behavior, storage model
 
 ## 1. Main request lifecycle
 
-```text
-Browser
-  │
-  ▼
-GET / or /static/*
-  │
-  └─ FastAPI serves the SPA shell and static assets.
+```mermaid
+sequenceDiagram
+    participant Browser
+    participant API as FastAPI
+    participant ModelManager
+    participant DB as SQLite
 
-POST /api/voice
-  │
-  ├─ Validate payload with Pydantic
-  ├─ Auto-select a model when `model_id` is omitted
-  ├─ Apply AI Emotion/Semantic analysis (Phase 4)
-  ├─ Resolve an engine through `ModelManager`
-  ├─ Generate audio bytes
-  ├─ Process audio effects via FFmpeg (ducking, EQ, FX) (Phase 1/2)
-  ├─ Write the output file under `generated_audio/`
-  └─ Store a row in the SQLite `voices` table
+    Browser->>API: POST /api/voice
+    API->>ModelManager: Auto-select & init engine
+    ModelManager-->>API: Return Engine Instance
+    API->>API: Apply Emotion/Semantic analysis
+    API->>API: Generate & apply FFmpeg FX
+    API->>DB: Store voice metadata
+    API-->>Browser: Return voice record
 
-POST /api/voice/mix (Audio Mixer - Phase 5)
-  │
-  ├─ Load multiple selected audio files via `pydub`
-  ├─ Overlay files at precise millisecond timestamps
-  ├─ Export master mixed `.wav`
-  └─ Store master mix in the SQLite `voices` table
-
-GET /api/voices/{voice_id}/audio
-  │
-  ├─ Read the voice record
-  ├─ Resolve the file path on disk
-  └─ Return `FileResponse` with the appropriate audio media type
+    Browser->>API: GET /api/voices/{voice_id}/audio
+    API->>DB: Read voice record
+    DB-->>API: file_path
+    API-->>Browser: Stream FileResponse (audio/wav)
 ```
 
 ---
@@ -69,14 +57,16 @@ This is the production-facing shape the repo now depends on.
 
 ## 3. Model selection path
 
-```text
-POST /api/voice
-  │
-  └─ `auto_select_model(text, language, style, model_manager)`
-        │
-        ├─ Ask `ModelManager` for installed engine candidates
-        ├─ Apply a score based on language/style/quality
-        └─ Return the highest-scoring installed model
+```mermaid
+flowchart LR
+    Request[POST /api/voice] --> AM{model_id given?}
+    AM -- Yes --> Load[Load Requested Engine]
+    AM -- No --> Score[Score Installed Engines]
+    Score --> |Lang match +50| Rank[Rank Highest Score]
+    Score --> |Style match +20| Rank
+    Score --> |Quality score| Rank
+    Rank --> Load
+    Load --> Generate[Generate Audio]
 ```
 
 If there is no installed model available, the default fallback is `edge-tts`.

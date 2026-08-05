@@ -11,6 +11,7 @@ from fastapi.staticfiles import StaticFiles
 
 from backend.app.api.routes import router as voice_router
 from backend.app.api.models_router import router as models_router
+from backend.app.api.stream_router import router as stream_router
 from backend.app.db.store import init_db
 from backend.app.services.model_manager import model_manager
 
@@ -68,6 +69,7 @@ app.add_middleware(
 
 app.include_router(voice_router)
 app.include_router(models_router)
+app.include_router(stream_router)
 
 app.mount("/static", StaticFiles(directory=FRONTEND_DIR / "static"), name="static")
 

@@ -29,6 +29,36 @@ The application is organized around four major layers:
    - [frontend/static/app.js](../frontend/static/app.js)
    - [frontend/static/app.css](../frontend/static/app.css)
 
+### Component Diagram
+
+```mermaid
+graph TD
+    subgraph Frontend
+    UI[index.html] --> JS[app.js / mixer.js]
+    end
+    
+    subgraph API Layer
+    Routes[routes.py]
+    Models[models_router.py]
+    end
+    
+    subgraph Service Layer
+    Gen[generator.py]
+    MM[model_manager.py]
+    Sem[semantic_analyzer.py]
+    Summ[summarizer.py]
+    end
+    
+    JS --> Routes
+    JS --> Models
+    
+    Routes --> Gen
+    Routes --> Sem
+    Routes --> Summ
+    
+    Gen --> MM
+```
+
 ---
 
 ## 2. Relevant runtime entrypoints
@@ -171,3 +201,9 @@ That reading order gives a reliable “startup → route → storage → model d
 - Batch jobs are background tasks and should not be treated as a fully durable long-running service without a stronger job store.
 - UI state and runtime preferences are still limited compared to a full operational admin panel.
 
+
+## Phase 7: UI Redesign & Premium Interactive Features
+- Upgraded UI with glassmorphism mouse-tracking glow.
+- Migrated SVG icons to the Lucide icon library.
+- Added a vertical 'Recent Generations' grid to the Studio tab with instant play/download.
+- Added Easter Eggs (Konami Code Theme, Clickable Confetti Header, Waveform typing reaction).

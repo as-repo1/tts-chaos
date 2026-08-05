@@ -1,0 +1,7 @@
+{
+  "script": "[ALICE] Hello there!\n[BOB] General Kenobi!",
+  "character_voices": {
+    "ALICE": {"model_id": "kokoro-82m", "voice_id": "af_heart"},
+    "BOB": {"model_id": "kokoro-82m", "voice_id": "am_adam"}
+  }
+}
