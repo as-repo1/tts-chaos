@@ -14,7 +14,7 @@
 
   <!-- Floating Top Navigation -->
   <nav class="top-nav">
-    <div class="nav-links">
+    <div class="nav-links nav-pill">
       <div class="nav-item active" data-tab="studio">
         <i data-lucide="mic"></i>
         Studio
@@ -93,7 +93,7 @@
                 
                 <div class="form-group">
                   <div class="range-header">
-                    <label class="form-label" id="text-label" style="margin-bottom: 0;">Text Prompt <span class="required">*</span></label>
+                    <label class="form-label" id="text-label" style="margin-bottom: 0;"><span id="text-label-text">Text Prompt </span><span class="required">*</span></label>
                     <div style="display: flex; gap: 12px; align-items: center;">
                       <input type="file" id="document-upload" accept=".txt,.pdf,.epub" style="display: none;">
                       <button type="button" class="btn btn-secondary btn-sm" onclick="document.getElementById('document-upload').click()" style="padding: 6px 12px; font-size: 12px; display: flex; align-items: center; gap: 4px;">
@@ -175,14 +175,20 @@
         <!-- Right Column: Settings Panel -->
         <div class="properties-panel">
           
-          <div class="batch-toggle">
-            <span>Batch Processing</span>
-            <div class="toggle-switch" id="batch-switch"></div>
-          </div>
-          
-          <div class="batch-toggle" style="margin-top: 12px;" title="Stream audio chunks in real-time">
-            <span>Live Streaming</span>
-            <div class="toggle-switch" id="stream-switch"></div>
+          <!-- Mode Toggles Card -->
+          <div class="glass panel-section" style="padding: 16px 20px;">
+            <div class="batch-toggle" style="margin-bottom: 12px; justify-content: space-between;">
+              <span style="display: flex; align-items: center; gap: 8px;">
+                <i data-lucide="layers" style="width: 16px; height: 16px; color: var(--primary);"></i> Batch Processing
+              </span>
+              <div class="toggle-switch" id="batch-switch"></div>
+            </div>
+            <div class="batch-toggle" style="margin-bottom: 0; justify-content: space-between;" title="Stream audio chunks in real-time">
+              <span style="display: flex; align-items: center; gap: 8px;">
+                <i data-lucide="radio" style="width: 16px; height: 16px; color: var(--accent);"></i> Live Streaming
+              </span>
+              <div class="toggle-switch" id="stream-switch"></div>
+            </div>
           </div>
 
           <div class="glass panel-section">

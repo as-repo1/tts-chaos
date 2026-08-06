@@ -26,16 +26,19 @@ const Toast = {
 const API = {
   async getCatalog() {
     const res = await fetch('/api/models/catalog');
+    if (!res.ok) throw new Error('Failed to fetch catalog');
     const data = await res.json();
     return data.models;
   },
   async getVoices(offset = 0, limit = 50) {
     const res = await fetch(`/api/voices?offset=${offset}&limit=${limit}`);
+    if (!res.ok) throw new Error('Failed to fetch voices');
     return res.json();
   },
-  async searchVoices(q = '', model = '', lang = '') {
+  async searchVoices(q = '', model = '', lang = '', signal = null) {
     const params = new URLSearchParams({ q, model, lang });
-    const res = await fetch(`/api/voices/search?${params}`);
+    const res = await fetch(`/api/voices/search?${params}`, { signal });
+    if (!res.ok) throw new Error('Failed to search voices');
     return res.json();
   },
   async getModelVoices(modelId) {
@@ -46,6 +49,7 @@ const API = {
   },
   async recommend(text, lang) {
     const res = await fetch(`/api/models/recommend?text=${encodeURIComponent(text)}&language=${lang}`);
+    if (!res.ok) return null;
     const data = await res.json();
     return data.recommended_model_id;
   },
@@ -310,7 +314,7 @@ batchSwitch.addEventListener('click', () => {
   State.isBatch = !State.isBatch;
   batchSwitch.classList.toggle('active', State.isBatch);
   document.getElementById('batch-hint').style.display = State.isBatch ? 'block' : 'none';
-  document.getElementById('text-label').childNodes[0].textContent = State.isBatch ? 'Batch Lines ' : 'Text Prompt ';
+  document.getElementById('text-label-text').textContent = State.isBatch ? 'Batch Lines ' : 'Text Prompt ';
   
   if (State.isBatch && State.isStreaming) {
     State.isStreaming = false;
@@ -326,7 +330,7 @@ streamSwitch.addEventListener('click', () => {
     State.isBatch = false;
     batchSwitch.classList.remove('active');
     document.getElementById('batch-hint').style.display = 'none';
-    document.getElementById('text-label').childNodes[0].textContent = 'Text Prompt ';
+    document.getElementById('text-label-text').textContent = 'Text Prompt ';
   }
 });
 
@@ -394,45 +398,69 @@ form.addEventListener('submit', async (e) => {
 });
 
 // --- Stream Playback Logic ---
+let sharedAudioCtx = null;
+
 async function playAudioStream(payload) {
   return new Promise((resolve, reject) => {
     const wsUrl = (window.location.protocol === 'https:' ? 'wss:' : 'ws:') + '//' + window.location.host + '/api/stream';
     const ws = new WebSocket(wsUrl);
     
-    // Web Audio API context
-    const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-    let nextStartTime = audioCtx.currentTime;
+    // Use a shared Web Audio API context to prevent memory leaks
+    if (!sharedAudioCtx) {
+      sharedAudioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    }
+    // Resume if it was suspended (autoplay policy)
+    if (sharedAudioCtx.state === 'suspended') {
+      sharedAudioCtx.resume();
+    }
+    
+    let nextStartTime = sharedAudioCtx.currentTime;
     let chunksReceived = 0;
+    let resolved = false;
     
     ws.onopen = () => {
       ws.send(JSON.stringify(payload));
+    };
+    
+    ws.onclose = () => {
+      if (!resolved) {
+        resolved = true;
+        resolve(); // resolve if it closed unexpectedly
+      }
     };
     
     ws.onmessage = async (event) => {
       if (typeof event.data === 'string') {
         const msg = JSON.parse(event.data);
         if (msg.type === 'error') {
+          if (!resolved) {
+            resolved = true;
+            reject(new Error(msg.message));
+          }
           ws.close();
-          reject(new Error(msg.message));
         } else if (msg.type === 'done') {
+          if (!resolved) {
+            resolved = true;
+            setTimeout(resolve, 1000); 
+          }
           ws.close();
-          // Wait for all audio to finish playing if needed, but we'll just resolve here
-          setTimeout(resolve, 1000); 
         }
       } else {
         // We received binary WAV data
         chunksReceived++;
         try {
           const arrayBuffer = await event.data.arrayBuffer();
-          const audioBuffer = await audioCtx.decodeAudioData(arrayBuffer);
+          const audioBuffer = await sharedAudioCtx.decodeAudioData(arrayBuffer);
           
-          const source = audioCtx.createBufferSource();
+          const source = sharedAudioCtx.createBufferSource();
           source.buffer = audioBuffer;
           source.playbackRate.value = State.settings.playbackSpeed;
-          source.connect(audioCtx.destination);
+          source.connect(sharedAudioCtx.destination);
           
-          if (nextStartTime < audioCtx.currentTime) {
-             nextStartTime = audioCtx.currentTime;
+          // Schedule playback
+          const currentTime = sharedAudioCtx.currentTime;
+          if (nextStartTime < currentTime) {
+            nextStartTime = currentTime;
           }
           source.start(nextStartTime);
           nextStartTime += audioBuffer.duration / State.settings.playbackSpeed;
@@ -574,7 +602,20 @@ async function renderLibrary() {
   }
 
   const offset = libraryPage * PAGE_SIZE;
-  const data = await API.searchVoices(q, model, lang);
+  let data = { voices: [] };
+  
+  if (window.searchAbortController) {
+    window.searchAbortController.abort();
+  }
+  window.searchAbortController = new AbortController();
+  
+  try {
+    data = await API.searchVoices(q, model, lang, window.searchAbortController.signal);
+  } catch (err) {
+    if (err.name === 'AbortError') return;
+    console.error("Search failed", err);
+  }
+  
   const list = document.getElementById('library-list');
   list.innerHTML = '';
 
@@ -734,7 +775,11 @@ document.getElementById('filter-lang').addEventListener('change', renderLibrary)
 
 async function updateLibraryBadge() {
   const data = await API.getVoices(0, 1);
-  document.getElementById('library-count-badge').textContent = data.total || 0;
+  const badge = document.getElementById('library-badge');
+  if (badge) {
+    badge.textContent = data.total || 0;
+    badge.style.display = data.total ? 'inline-block' : 'none';
+  }
 }
 
 // ─── DASHBOARD LOGIC ───────────────────────────────────────────────────────
@@ -827,7 +872,6 @@ cloneForm.addEventListener('submit', async (e) => {
 
 const settingsOverlay = document.getElementById('settings-overlay');
 const settingsDrawer = document.getElementById('settings-drawer');
-const settingFormat = document.getElementById('setting-format');
 const settingAutoplay = document.getElementById('setting-autoplay');
 const settingPlaybackSpeed = document.getElementById('setting-playback-speed');
 const settingPlaybackSpeedVal = document.getElementById('setting-playback-speed-val');
@@ -1453,20 +1497,6 @@ document.addEventListener('DOMContentLoaded', () => {
             document.body.appendChild(conf);
             setTimeout(() => conf.remove(), 3000);
         }
-    }
-
-    // 5. Waveform reacts to typing
-    const textInput = document.getElementById('text');
-    if (textInput && window.visualizer) {
-        textInput.addEventListener('input', () => {
-            if(window.visualizer.draw) {
-                const dataArray = new Uint8Array(window.visualizer.bufferLength || 128);
-                for(let i=0; i < dataArray.length; i++) {
-                    dataArray[i] = 128 + (Math.random() * 50 - 25);
-                }
-                window.visualizer.draw(dataArray);
-            }
-        });
     }
 
     // 6. Fetch Recent Voices

@@ -12,6 +12,7 @@ def parse_document(file_bytes: bytes, filename: str) -> str:
     Extract text from a document based on its extension.
     Supported extensions: .txt, .pdf, .epub
     """
+    filename = filename or ""
     ext = filename.lower().split('.')[-1]
     
     if ext == 'txt':

@@ -4,9 +4,9 @@ import io
 import struct
 import wave
 import logging
+import os
 from pathlib import Path
 from datetime import datetime, timezone
-from backend.app.config import settings
 from fastapi.concurrency import run_in_threadpool
 import inspect
 
@@ -140,4 +140,39 @@ def delete_audio_file(file_path: str) -> None:
             logger.info("Deleted audio file: %s", file_path)
     except Exception:
         logger.warning("Failed to delete audio file: %s", file_path, exc_info=True)
+
+
+def convert_audio_sync(audio_bytes: bytes, target_format: str) -> bytes:
+    """Synchronously converts audio bytes to a target format using FFmpeg."""
+    if target_format == "wav":
+        return audio_bytes
+        
+    import subprocess
+    import tempfile
+    
+    with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as temp_in, \
+         tempfile.NamedTemporaryFile(suffix=f".{target_format}", delete=False) as temp_out:
+        temp_in.write(audio_bytes)
+        temp_in.flush()
+        
+        in_path = temp_in.name
+        out_path = temp_out.name
+        
+    try:
+        cmd = [
+            "ffmpeg", "-y", "-i", in_path, 
+            "-f", target_format, 
+            out_path
+        ]
+        subprocess.run(cmd, check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        
+        with open(out_path, "rb") as f:
+            converted_bytes = f.read()
+            
+        return converted_bytes
+    finally:
+        if os.path.exists(in_path):
+            os.remove(in_path)
+        if os.path.exists(out_path):
+            os.remove(out_path)
 

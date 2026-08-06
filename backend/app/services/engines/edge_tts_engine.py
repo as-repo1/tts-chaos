@@ -3,6 +3,7 @@ import asyncio
 import io
 import logging
 import concurrent.futures
+import typing
 from .base import TTSEngine
 
 logger = logging.getLogger(__name__)

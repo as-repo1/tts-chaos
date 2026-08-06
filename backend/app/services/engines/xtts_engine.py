@@ -2,6 +2,7 @@ import io
 import wave
 import torch
 import numpy as np
+import typing
 from unittest.mock import patch
 
 # Monkey patch numpy for older libraries expecting broadcast_to in stride_tricks

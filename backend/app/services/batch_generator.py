@@ -75,6 +75,11 @@ async def process_batch_job(job_id: str, text: str, voice_settings: dict, output
     job["total_chunks"] = total_chunks
     job["progress_percent"] = 0
 
+    if total_chunks == 0:
+        job["status"] = "completed"
+        job["progress_percent"] = 100
+        return
+
     work_dir = tempfile.mkdtemp(prefix=f"tts_batch_{job_id}_")
 
     # Create a 1-second silence WAV for natural paragraph pauses

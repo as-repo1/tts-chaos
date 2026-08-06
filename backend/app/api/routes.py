@@ -20,6 +20,7 @@ from backend.app.services.generator import (
     AUDIO_DIR
 )
 from backend.app.services.model_selector import auto_select_model
+from fastapi.concurrency import run_in_threadpool
 
 logger = logging.getLogger(__name__)
 
@@ -220,7 +221,8 @@ async def create_cloned_voice(
             raise HTTPException(status_code=500, detail=f"XTTS-v2 model is required for cloning but failed to download: {e}")
 
     try:
-        asset = generate_cloned_audio_asset(
+        asset = await run_in_threadpool(
+            generate_cloned_audio_asset,
             text=text,
             ref_audio_path=tmp_path,
             voice_name=voice_name,
@@ -307,7 +309,6 @@ async def remove_voice(voice_id: str, background_tasks: BackgroundTasks) -> dict
 
 @router.post("/voice/mix")
 async def mix_audio_tracks(payload: MixRequest) -> dict[str, Any]:
-    from backend.app.db.database import get_voice
     import uuid
     import time
     from pydub import AudioSegment
@@ -324,7 +325,7 @@ async def mix_audio_tracks(payload: MixRequest) -> dict[str, Any]:
             if not voice_record:
                 continue
                 
-            file_path = AUDIO_DIR / voice_record["file_name"]
+            file_path = Path(voice_record.get("file_path", AUDIO_DIR / voice_record.get("file_name", "")))
             if not file_path.exists():
                 continue
                 
@@ -353,7 +354,6 @@ async def mix_audio_tracks(payload: MixRequest) -> dict[str, Any]:
         mixed.export(str(file_path), format=payload.output_format)
         
         # Save to DB
-        from backend.app.db.database import save_voice
         record = await save_voice(
             voice_name=payload.name,
             language="mix",
@@ -363,7 +363,7 @@ async def mix_audio_tracks(payload: MixRequest) -> dict[str, Any]:
             voice_id="mixer",
             speed=1.0,
             pitch=0.0,
-            file_name=file_name
+            file_path=str(file_path)
         )
         return record
         
@@ -436,7 +436,7 @@ class SceneRequest(BaseModel):
 async def create_scene(payload: SceneRequest) -> dict[str, Any]:
     from backend.app.services.scene_generator import generate_scene
     try:
-        result = await generate_scene(payload.script, payload.character_voices, payload.settings)
+        result = await run_in_threadpool(generate_scene, payload.script, payload.character_voices, payload.settings)
         
         record = await save_voice(
             voice_name="scene",
@@ -447,7 +447,7 @@ async def create_scene(payload: SceneRequest) -> dict[str, Any]:
             voice_id="mixed",
             speed=1.0,
             pitch=0.0,
-            file_path=result["file_path"],
+            file_path=str(result["file_path"]),
             file_size=Path(result["file_path"]).stat().st_size,
             duration_sec=None,
             output_format="wav",
@@ -474,7 +474,7 @@ async def create_voice_from_rss(payload: RSSRequest) -> dict[str, Any]:
     from backend.app.services.generator import AUDIO_DIR
     
     try:
-        texts = fetch_rss_feed(payload.url)
+        texts = await run_in_threadpool(fetch_rss_feed, payload.url)
     except Exception as exc:
         raise HTTPException(status_code=400, detail=str(exc))
         

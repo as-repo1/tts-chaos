@@ -71,6 +71,7 @@ app.include_router(voice_router)
 app.include_router(models_router)
 app.include_router(stream_router)
 
+(FRONTEND_DIR / "static").mkdir(parents=True, exist_ok=True)
 app.mount("/static", StaticFiles(directory=FRONTEND_DIR / "static"), name="static")
 
 

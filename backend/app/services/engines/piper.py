@@ -1,5 +1,5 @@
 from __future__ import annotations
-import io, wave
+import io, wave, typing
 from pathlib import Path
 from .base import TTSEngine
 
